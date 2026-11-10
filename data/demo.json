@@ -61,6 +61,8 @@
       "n": 1,
       "type": "regular",
       "date": "2026-11-16",
+      "baseline": true,
+      "multiplier": 0.5,
       "course": {
         "name": "TPC Scottsdale (Stadium)",
         "note": "Home of the WM Phoenix Open",
@@ -172,11 +174,11 @@
           "holes": [4, 5, 4, 3, 2, 5, 3, 4, 4, 3, 4, 3, 5, 4, 4, 3, 3, 5]
         },
         {
-          "players": ["p4", "p7"],
+          "players": ["p4", "p6"],
           "holes": [4, 6, 4, 4, 3, 6, 5, 5, 3, 3, 3, 3, 3, 5, 4, 2, 3, 5]
         },
         {
-          "players": ["p5", "p6"],
+          "players": ["p5", "p7"],
           "holes": [5, 6, 5, 5, 5, 6, 4, 2, 4, 5, 4, 3, 3, 6, 3, 4, 4, 6]
         }
       ]

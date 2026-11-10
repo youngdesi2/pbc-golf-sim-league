@@ -147,9 +147,10 @@
     players.forEach((p) => { byId[p.id] = p; });
     const name = (id) => (byId[id] ? byId[id].name : id);
 
-    const idx = {}, diffs = {}, idxLog = {}, totals = {}, money = {};
+    const idx = {}, diffs = {}, idxLog = {}, totals = {}, money = {}, startOf = {};
     players.forEach((p) => {
       idx[p.id] = p.startIndex;
+      startOf[p.id] = p.startIndex;
       diffs[p.id] = [];
       idxLog[p.id] = [];
       totals[p.id] = { rr: 0, attend: 0, scramble: 0, total: 0, stableford: 0, played: 0, lowGross: 0, rrHist: [] };
@@ -184,6 +185,10 @@
       /* ===== regular week ===== */
       if (week.type === 'regular') {
         const rows = {};
+        /* a week can count for less (week 1 baseline round = 0.5) */
+        const mult = week.multiplier != null ? week.multiplier : 1;
+        out.multiplier = mult;
+        out.baseline = !!week.baseline;
         players.forEach((p) => {
           const r = week.rounds && week.rounds[p.id];
           if (r == null) return;
@@ -214,15 +219,16 @@
             const a = rows[id].stableford, b = rows[o].stableford;
             w += a > b ? 1 : a === b ? 0.5 : 0;
           });
-          rows[id].rr = n > 1 ? r2((rrMax * w) / (n - 1)) : 0;
-          rows[id].attend = cfg.attendancePoint;
+          rows[id].rrRaw = n > 1 ? r2((rrMax * w) / (n - 1)) : 0;
+          rows[id].rr = r2(rows[id].rrRaw * mult);
+          rows[id].attend = r2(cfg.attendancePoint * mult);
         });
         /* excused absences get the player's average round-robin points so far */
         (week.excused || []).forEach((id) => {
           if (!byId[id] || rows[id]) return;
           const h = totals[id].rrHist;
           rows[id] = {
-            id, excused: true, rr: h.length ? r2(sum(h) / h.length) : r2(rrMax / 2), attend: 0,
+            id, excused: true, rr: r2(mult * (h.length ? sum(h) / h.length : rrMax / 2)), attend: 0,
             hcp: null, gross: null, net: null, stableford: null,
           };
         });
@@ -238,7 +244,7 @@
           out.points[id] = row.total;
           t.rr += row.rr; t.attend += row.attend; t.total = r2(t.total + row.total);
           if (!row.excused) {
-            t.stableford += row.stableford; t.played++; t.rrHist.push(row.rr);
+            t.stableford += row.stableford; t.played++; t.rrHist.push(row.rrRaw);
             if (row.gross === minGross) { t.lowGross++; row.lowGross = true; }
           }
         });
@@ -270,9 +276,16 @@
           const before = idx[id];
           const d = r1(rows[id].diff - offset);
           rows[id].diffAdj = d;
-          diffs[id].push(d);
-          idx[id] = nextIndex(byId[id].startIndex, before, diffs[id], cfg.hcp);
-          idxLog[id].push({ week: week.n, before, diff: d, raw: rows[id].diff, after: idx[id] });
+          if (week.baseline) {
+            /* baseline round: your index is set from this round (no weekly cap), and it becomes your anchor */
+            idx[id] = r1(clamp(d, cfg.hcp.minIndex, cfg.hcp.maxIndex));
+            startOf[id] = idx[id];
+            diffs[id] = [];
+          } else {
+            diffs[id].push(d);
+            idx[id] = nextIndex(startOf[id], before, diffs[id], cfg.hcp);
+          }
+          idxLog[id].push({ week: week.n, before, diff: d, raw: rows[id].diff, after: idx[id], baseline: !!week.baseline });
           rows[id].idxAfter = idx[id];
         });
       }
@@ -422,7 +435,7 @@
       const tied = i > 0 && totals[prev].total === t.total && totals[prev].stableford === t.stableford;
       return {
         rank: i + 1, id, name: name(id), index: idx[id], startIndex: byId[id].startIndex,
-        played: t.played, rr: r2(t.rr), attend: t.attend, scramble: r2(t.scramble),
+        played: t.played, rr: r2(t.rr), attend: r2(t.attend), scramble: r2(t.scramble),
         total: r2(t.total), stableford: t.stableford, lowGross: t.lowGross,
         skinsNet: r2(money[id].won - money[id].in), skinsWon: r2(money[id].won), skinsIn: money[id].in,
         tied,

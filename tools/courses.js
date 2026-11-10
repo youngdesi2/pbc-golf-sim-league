@@ -2,7 +2,7 @@
  * cards, LiveTourney for St Andrews). The sim's own scorecard can differ slightly (tee box, par
  * conversions), so the commissioner can override any week's par/SI from the admin page. */
 module.exports = [
-  { n: 1, type: 'regular', date: '2026-11-16',
+  { n: 1, type: 'regular', date: '2026-11-16', baseline: true, multiplier: 0.5,
     course: { name: 'TPC Scottsdale (Stadium)', note: 'Home of the WM Phoenix Open',
       par: [4,4,5,3,4,4,3,4,4,4,4,3,5,4,5,3,4,4], si: [14,8,4,18,6,12,16,2,10,11,1,15,5,7,9,17,13,3] } },
   { n: 2, type: 'regular', date: '2026-11-23',

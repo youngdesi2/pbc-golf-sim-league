@@ -61,6 +61,8 @@
       "n": 1,
       "type": "regular",
       "date": "2026-11-16",
+      "baseline": true,
+      "multiplier": 0.5,
       "course": {
         "name": "TPC Scottsdale (Stadium)",
         "note": "Home of the WM Phoenix Open",

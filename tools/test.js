@@ -37,7 +37,7 @@ for (const f of ['demo.json', 'demo-full.json']) {
   const S = L.compute(lg);
   const n = lg.players.length;
   const reg = S.weeks.filter((w) => w.type === 'regular' && w.played);
-  ok(reg.every((w) => near(Object.values(w.rows).filter((r) => !r.excused).reduce((s, r) => s + r.rr, 0), (Object.keys(w.rows).length * (n - 1)) / 2, 0.05 * n)),
+  ok(reg.every((w) => near(Object.values(w.rows).filter((r) => !r.excused).reduce((s, r) => s + r.rr, 0), ((Object.keys(w.rows).length * (n - 1)) / 2) * w.multiplier, 0.05 * n)),
     f + ': round-robin points per week add up');
   const sc = S.weeks.filter((w) => w.type === 'scramble' && w.played);
   ok(sc.every((w) => near(w.teams.reduce((s, t) => s + t.points * 2, 0), lg.config.scramblePoints ? 0 : 2 * (18 + 14 + 11 + 8 + 5), 0.1)), f + ': scramble ladder paid to both partners');
@@ -45,13 +45,16 @@ for (const f of ['demo.json', 'demo-full.json']) {
   const won = Object.values(S.money).reduce((s, m) => s + m.won, 0);
   ok(near(inn, won + S.carry, 0.05), f + ': skins money conserved (in = paid out + unclaimed carry)  in=' + inn + ' won=' + won.toFixed(2) + ' carry=' + S.carry);
   ok(S.standings.every((r) => r.index >= -6 && r.index <= 50), f + ': indexes stay inside min/max');
-  ok(S.idxLog && Object.values(S.idxLog).every((l) => l.every((e) => e.after - e.before <= 2.0001 && e.before - e.after <= 3.0001)), f + ': weekly index change capped at +2 / -3');
+  ok(S.idxLog && Object.values(S.idxLog).every((l) => l.every((e) => e.baseline || (e.after - e.before <= 2.0001 && e.before - e.after <= 3.0001))), f + ': weekly index change capped at +2 / -3');
   if (f === 'demo-full.json') {
     ok(S.matches.length === 11, 'full season: 5 playoff + 6 consolation matches, got ' + S.matches.length);
     ok(!!S.champion, 'full season: a champion is crowned -> ' + (S.champion && S.byId[S.champion].name));
     ok(S.matches.filter((m) => m.bracket === 'playoff').every((m) => m.winner), 'every playoff match has a winner');
     ok(S.consolation.length === 4 && S.consolation.every((c) => c.played === 3), 'consolation: 4 players, 3 matches each');
   }
+  const w1x = S.weeks.find((w) => w.n === 1);
+  ok(w1x.baseline && w1x.multiplier === 0.5 && Math.max.apply(null, Object.values(w1x.rows).map((r) => r.total)) <= 5.0001, f + ': week 1 is a baseline round worth half points (max 5)');
+  ok(Object.keys(w1x.rows).every((id) => near(S.idxLog[id][0].after, Math.max(-6, Math.min(50, w1x.rows[id].diffAdj)), 0.051)), f + ': week 1 sets each index from the round, with no weekly cap');
   console.log('\n' + f + ' standings:');
   S.standings.forEach((r) => console.log(String(r.rank).padStart(2), r.name.padEnd(8), 'idx', L.fmtIndex(r.index).padStart(5), 'pts', String(r.total).padStart(6), 'sf', String(r.stableford).padStart(4), 'skins', L.fmtMoney(r.skinsNet)));
   if (S.warnings.length) console.log('warnings:', S.warnings);

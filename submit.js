@@ -63,7 +63,7 @@
       const hcp = L.courseHcp(idx, { slope: 113, rating: course.parTotal, parTotal: course.parTotal });
       strokes = L.strokeArray(hcp, course.si);
       existing = src.rounds && L.completeRound(src.rounds[pid]) ? src.rounds[pid] : null;
-      head = '<div class="msg info">Your course handicap this week: <b>' + L.fmtHcp(hcp) + '</b> (index ' + L.fmtIndex(idx) + '). The dots show where you get strokes. Enter a <b>P</b> for a pickup.</div>';
+      head = '<div class="msg info">Your course handicap this week: <b>' + L.fmtHcp(hcp) + '</b> (index ' + L.fmtIndex(idx) + '). The dots show where you get strokes. Enter a <b>P</b> for a pickup.' + (w.baseline ? '<br><b>Baseline round:</b> counts half points and sets your handicap for the rest of the season.' : '') + '</div>';
     }
     if (src.locked) head += '<div class="msg err" style="margin-top:8px">This week is locked. Only the commissioner can change scores.</div>';
 
