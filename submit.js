@@ -61,26 +61,27 @@
       head = '<div class="msg info"><b>Team scramble</b> with ' + esc(R.nm(S, partner)) + '. Enter the TEAM score on each hole. Team handicap: <b>' + team.teamHcp + '</b>.</div>';
     } else {
       const idx = w.hcpBefore[pid];
-      const hcp = L.courseHcp(idx, { slope: 113, rating: course.parTotal, parTotal: course.parTotal });
+      const hcp = L.courseHcp(idx, course);
       strokes = L.strokeArray(hcp, course.si);
-      existing = src.rounds && L.completeRound(src.rounds[pid]) ? src.rounds[pid] : null;
+      existing = src.rounds && L.completeRound(src.rounds[pid], course.par.length) ? src.rounds[pid] : null;
       head = '<div class="msg info">Course handicap this week: <b>' + L.fmtHcp(hcp) + '</b> (index ' + L.fmtIndex(idx) + '). The dots show where you get strokes. Enter a <b>P</b> for a pickup.' + (w.baseline ? '<br><b>Baseline round:</b> counts half points and sets your handicap for the rest of the season.' : '') + '</div>';
     }
 
+    const nH = course.par.length, hn = course.holeNums;
     const hole = (i) => {
       const s = strokes[i];
-      return '<div class="hole"><div class="hn">' + (i + 1) + '</div><div class="hp"><span>Par ' + course.par[i] + '</span><span>Hcp ' + course.si[i] + '</span></div><div class="dots">' + (s > 0 ? '•'.repeat(Math.min(s, 4)) : s < 0 ? '−' : '') + '</div>' +
-        '<input data-i="' + i + '" type="text" inputmode="numeric" maxlength="2" autocomplete="off" aria-label="Hole ' + (i + 1) + '" value="' + (existing ? existing[i] : '') + '"></div>';
+      return '<div class="hole"><div class="hn">' + hn[i] + '</div><div class="hp"><span>Par ' + course.par[i] + '</span><span>Hcp ' + course.siCard[i] + '</span></div><div class="dots">' + (s > 0 ? '•'.repeat(Math.min(s, 4)) : s < 0 ? '−' : '') + '</div>' +
+        '<input data-i="' + i + '" type="text" inputmode="numeric" maxlength="2" autocomplete="off" aria-label="Hole ' + hn[i] + '" value="' + (existing ? existing[i] : '') + '"></div>';
     };
     let front = '', back = '';
-    for (let i = 0; i < 9; i++) { front += hole(i); back += hole(i + 9); }
+    if (nH === 9) { for (let i = 0; i < 9; i++) front += hole(i); } else { for (let i = 0; i < 9; i++) { front += hole(i); back += hole(i + 9); } }
 
     box.innerHTML =
-      '<section class="panel">' + R.weekName(w) + ' &middot; <b>' + esc(course.name) + '</b> &middot; Par ' + course.parTotal + (existing ? ' <span class="tag green">already submitted: editing</span>' : '') +
+      '<section class="panel">' + R.weekName(w) + ' &middot; <b>' + esc(course.name) + '</b> &middot; Par ' + course.parTotal + (nH === 9 ? ' &middot; 9 holes' : '') + (existing ? ' <span class="tag green">already submitted: editing</span>' : '') +
       '<div style="margin:12px 0">' + head + '</div>' +
-      '<div class="legend-h" style="margin:6px 0 4px">Front nine</div><div class="holes">' + front + '</div>' +
-      '<div class="legend-h" style="margin:12px 0 4px">Back nine</div><div class="holes">' + back + '</div>' +
-      '<div class="totals" style="margin-top:14px"><div><b id="tg">0</b><span>Gross</span></div><div><b id="tn">0</b><span>Net</span></div><div><b id="ts">' + (team ? '-' : '0') + '</b><span>' + (team ? 'To par' : 'Stableford') + '</span></div><div><b id="td">0/18</b><span>Holes</span></div></div>' +
+      '<div class="legend-h" style="margin:6px 0 4px">' + (nH === 9 ? (course.nine === 'back' ? 'Back nine (holes 10-18)' : 'Front nine (holes 1-9)') : 'Front nine') + '</div><div class="holes">' + front + '</div>' +
+      (nH === 9 ? '' : '<div class="legend-h" style="margin:12px 0 4px">Back nine</div><div class="holes">' + back + '</div>') +
+      '<div class="totals" style="margin-top:14px"><div><b id="tg">0</b><span>Gross</span></div><div><b id="tn">0</b><span>Net</span></div><div><b id="ts">' + (team ? '-' : '0') + '</b><span>' + (team ? 'To par' : 'Stableford') + '</span></div><div><b id="td">0/' + nH + '</b><span>Holes</span></div></div>' +
       '<div style="margin-top:14px;display:grid;gap:10px"><button class="btn dark" id="go" type="button">' + (existing ? 'Update scorecard' : 'Submit scorecard') + '</button><div id="msg"></div></div></section>';
 
     const inputs = Array.from(box.querySelectorAll('.hole input'));
@@ -97,7 +98,7 @@
         sf += Math.max(0, 2 - (g - strokes[i] - course.par[i]));
         if (g < course.par[i]) inp.classList.add('birdie'); else if (g > course.par[i]) inp.classList.add('bogey');
       });
-      $('tg').textContent = gross; $('tn').textContent = gross - st; $('td').textContent = done + '/18';
+      $('tg').textContent = gross; $('tn').textContent = gross - st; $('td').textContent = done + '/' + nH;
       if (team) { const pp = course.par.slice().filter((_, i) => VALID.test(inputs[i].value.trim().toUpperCase())).reduce((a, b) => a + b, 0); $('ts').textContent = done ? (gross - pp > 0 ? '+' : '') + (gross - pp) : '-'; } else $('ts').textContent = sf;
     };
     inputs.forEach((inp, i) => {

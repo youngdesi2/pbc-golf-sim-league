@@ -104,7 +104,7 @@ create or replace function public._valid_holes(p_holes jsonb, p_allow_pickup boo
 returns boolean language plpgsql immutable as $$
 declare e jsonb; n numeric;
 begin
-  if p_holes is null or jsonb_typeof(p_holes) <> 'array' or jsonb_array_length(p_holes) <> 18 then
+  if p_holes is null or jsonb_typeof(p_holes) <> 'array' or jsonb_array_length(p_holes) not in (9, 18) then
     return false;
   end if;
   for e in select * from jsonb_array_elements(p_holes) loop
@@ -147,7 +147,7 @@ begin
   if p_witness is null or length(trim(p_witness)) = 0 then raise exception 'Pick the witness who watched this round'; end if;
   if p_witness = p_player then raise exception 'The witness cannot be the player'; end if;
   if not public._valid_holes(p_holes, true) then
-    raise exception 'A scorecard needs 18 holes, each a whole number from 1 to 20 (or P for a pickup)';
+    raise exception 'A scorecard needs 9 or 18 holes, each a whole number from 1 to 20 (or P for a pickup)';
   end if;
   insert into public.submissions(week, player_id, holes, witness)
   values (p_week, p_player, p_holes, p_witness)
@@ -167,7 +167,7 @@ begin
   if p_team is null or length(p_team) > 90 then raise exception 'Bad team'; end if;
   if p_witness is null or length(trim(p_witness)) = 0 then raise exception 'Pick the witness who watched this round'; end if;
   if not public._valid_holes(p_holes, false) then
-    raise exception 'A team scorecard needs 18 holes, each a whole number from 1 to 20';
+    raise exception 'A team scorecard needs 9 or 18 holes, each a whole number from 1 to 20';
   end if;
   insert into public.team_submissions(week, team_key, holes, witness)
   values (p_week, p_team, p_holes, p_witness)

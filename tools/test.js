@@ -60,4 +60,29 @@ for (const f of ['demo.json', 'demo-full.json']) {
   if (S.warnings.length) console.log('warnings:', S.warnings);
 }
 console.log(fails ? '\n' + fails + ' FAILED' : '\nall passed');
+
+/* --- 9-hole weeks (front / back nine, set per week by the commissioner) --- */
+{
+  const mk9 = (off, n) => par.slice(off, off + 9).map((p) => p + n);
+  const lg = (extra) => ({
+    config: { skinsBuyIn: 10 },
+    players: ['a', 'b', 'c', 'd'].map((id) => ({ id, name: id.toUpperCase(), startIndex: 18 })),
+    weeks: [Object.assign({ n: 1, type: 'regular', holes: 9, nine: 'front', rounds: { a: mk9(0, 0), b: mk9(0, 1), c: mk9(0, 1), d: mk9(0, 2) } }, extra || {})],
+  });
+  const f = L.compute(lg());
+  const cf = f.weeks[0].course;
+  ok(cf.par.length === 9 && cf.holeNums.join() === '1,2,3,4,5,6,7,8,9' && cf.si.slice().sort((a, b) => a - b).join() === '1,2,3,4,5,6,7,8,9', '9-hole front: 9 holes, strokes ranked 1..9');
+  ok(f.weeks[0].rows.a.hcp === 9, 'index 18 gets a 9-hole course handicap of 9');
+  ok(f.weeks[0].rows.a.st.reduce((x, y) => x + y, 0) === 9 && f.weeks[0].rows.a.stableford > 0, '9 strokes spread over 9 holes (one each)');
+  ok(f.weeks[0].rows.a.diff === L.compute(lg()).weeks[0].rows.a.diff && typeof f.weeks[0].rows.a.diff === 'number', '9-hole differential computes');
+  const bk = L.compute({ config: {}, players: lg().players, weeks: [{ n: 1, type: 'regular', holes: 9, nine: 'back', rounds: { a: mk9(9, 0), b: mk9(9, 1), c: mk9(9, 1), d: mk9(9, 2) } }] });
+  ok(bk.weeks[0].course.holeNums[0] === 10 && bk.weeks[0].course.holeNums[8] === 18 && bk.weeks[0].played, '9-hole back: holes 10-18 and the round is counted');
+  ok(bk.weeks[0].skins && bk.weeks[0].skins.holes.length === 9 && bk.weeks[0].skins.holes[0].hole === 10, 'skins run over 9 holes and are labelled 10-18');
+  const bad = L.compute({ config: {}, players: lg().players, weeks: [{ n: 1, type: 'regular', holes: 9, rounds: { a: mk(0) } }] });
+  ok(!bad.weeks[0].played && bad.warnings.length === 1, 'an 18-hole card in a 9-hole week is rejected, not scored');
+  const skinsSum = f.weeks[0].skins.winners.reduce((x, w) => x + w.amount, 0);
+  ok(!f.weeks[0].skins.skinsWon || Math.abs(skinsSum - f.weeks[0].skins.pot) < 0.01, '9-hole skins: money conserved');
+  /* a player who shoots net par on every hole has the same 9-hole stableford ratio as on 18 */
+  ok(L.strokeArray(9, f.weeks[0].course.si).every((x) => x === 1), 'strokeArray uses the number of holes played');
+}
 process.exit(fails ? 1 : 0);

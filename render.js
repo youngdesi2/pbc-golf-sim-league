@@ -43,6 +43,12 @@
     return d <= -2 ? 'h-eagle' : d === -1 ? 'h-birdie' : d === 0 ? 'h-par' : d === 1 ? 'h-bogey' : 'h-dbl';
   }
   function courseTable(c) {
+    if (c.par.length === 9) {
+      const cs = (arr) => arr.map((x) => '<td>' + x + '</td>').join('');
+      return '<div class="scroll"><table class="card mini"><thead><tr><th>Hole</th>' + c.holeNums.map((h) => '<th>' + h + '</th>').join('') + '<th>Tot</th></tr></thead><tbody>' +
+        '<tr><th>Par</th>' + cs(c.par) + '<td class="sub">' + c.parTotal + '</td></tr>' +
+        '<tr><th>Hcp</th>' + cs(c.siCard) + '<td></td></tr></tbody></table></div>';
+    }
     const cells = (arr, a, b) => arr.slice(a, b).map((x) => '<td>' + x + '</td>').join('');
     const sum = (arr, a, b) => arr.slice(a, b).reduce((x, y) => x + y, 0);
     return '<div class="scroll"><table class="card mini"><thead><tr><th>Hole</th>' +
@@ -54,11 +60,19 @@
   function courseHeader(w) {
     const c = w.course;
     return '<div class="course-head' + (c.major ? ' major' : '') + '"><div><div class="eyebrow">' + esc(weekName(w)) + ' &middot; ' + esc(fmtDate(w.date)) + '</div>' +
-      '<h2>' + esc(c.name) + '</h2>' + (c.note ? '<div class="note">' + esc(c.note) + '</div>' : '') + '</div><div>' + weekTag(w) + '<span class="tag">Par ' + c.parTotal + '</span></div></div>';
+      '<h2>' + esc(c.name) + '</h2>' + (c.note ? '<div class="note">' + esc(c.note) + '</div>' : '') + '</div><div>' + weekTag(w) + '<span class="tag">Par ' + c.parTotal + '</span>' + (c.par.length === 9 ? '<span class="tag gold">9 holes &middot; ' + c.nine + ' nine</span>' : '') + '</div></div>';
   }
 
   /* hole-by-hole scorecards for a set of rows [{label, holes, sub}] */
   function scorecards(rows, course) {
+    if (course.par.length === 9) {
+      const row9 = (r) => '<tr><th class="who">' + esc(r.label) + (r.sub ? '<small>' + esc(r.sub) + '</small>' : '') + '</th>' +
+        r.holes.map((v, i) => '<td class="' + holeClass(v, course.par[i]) + '"><span>' + (L.isPickup(v) ? 'P' : v) + '</span></td>').join('') +
+        '<td class="sub b">' + r.holes.reduce((a, v, i) => a + (L.isPickup(v) ? course.par[i] + 5 : v), 0) + '</td></tr>';
+      return '<div class="scroll"><table class="card"><thead><tr><th>Hole</th>' + course.holeNums.map((h) => '<th>' + h + '</th>').join('') + '<th>Tot</th></tr>' +
+        '<tr class="parrow"><th>Par</th>' + course.par.map((x) => '<td>' + x + '</td>').join('') + '<td class="sub b">' + course.parTotal + '</td></tr></thead><tbody>' + rows.map(row9).join('') + '</tbody></table></div>' +
+        '<div class="key"><span class="h-eagle"><span>2</span></span> eagle+ <span class="h-birdie"><span>3</span></span> birdie <span class="h-par"><span>4</span></span> par <span class="h-bogey"><span>5</span></span> bogey <span class="h-dbl"><span>6</span></span> double+ <span class="h-pick"><span>P</span></span> pickup</div>';
+    }
     const row = (r) => {
       const hs = r.holes;
       const cell = (i) => '<td class="' + holeClass(hs[i], course.par[i]) + '"><span>' + (L.isPickup(hs[i]) ? 'P' : hs[i]) + '</span></td>';
@@ -212,7 +226,7 @@
       if (w.played) {
         out += skinsBlock(S, w);
         const rounds = (src.rounds) || {};
-        const rows = S.res.players.filter((p) => L.completeRound(rounds[p.id])).map((p) => ({ label: p.name, sub: stamps[p.id] ? fmtStamp(stamps[p.id]) : '', holes: rounds[p.id] }));
+        const rows = S.res.players.filter((p) => L.completeRound(rounds[p.id], w.course.par.length)).map((p) => ({ label: p.name, sub: stamps[p.id] ? fmtStamp(stamps[p.id]) : '', holes: rounds[p.id] }));
         if (rows.length) out += '<section class="panel"><h3>Scorecards</h3>' + scorecards(rows, w.course) + '</section>';
       } else out += courseTable(w.course);
     }
@@ -265,8 +279,8 @@
     } else {
       const course = w.course, rounds = src.rounds || {};
       S.res.players.forEach((p) => {
-        if (!L.completeRound(rounds[p.id])) return;
-        const h = L.courseHcp(w.hcpBefore[p.id], { slope: 113, rating: course.parTotal, parTotal: course.parTotal });
+        if (!L.completeRound(rounds[p.id], w.course.par.length)) return;
+        const h = L.courseHcp(w.hcpBefore[p.id], course);
         const st = L.strokeArray(h, course.si);
         const g = rounds[p.id].reduce((a, v, k) => a + (L.isPickup(v) ? course.par[k] + st[k] + 2 : v), 0);
         data.push({ id: p.id, gross: g, net: g - st.reduce((a, b) => a + b, 0) });
@@ -315,7 +329,7 @@
   function coursehcpBlock(S, w) {
     const course = w.course;
     const idx = w.hcpBefore;
-    const rows = S.res.players.map((p) => ({ p, h: L.courseHcp(idx[p.id], { slope: 113, rating: course.parTotal, parTotal: course.parTotal }) })).sort((a, b) => a.h - b.h);
+    const rows = S.res.players.map((p) => ({ p, h: L.courseHcp(idx[p.id], course) })).sort((a, b) => a.h - b.h);
     return '<section class="panel"><h3>Course handicaps for this week</h3><p class="muted">Based on current indexes. Strokes land on the hardest holes first.</p><div class="hcps">' +
       rows.map((r) => '<div class="hcpbox"><span>' + esc(r.p.name) + '</span><b>' + L.fmtHcp(r.h) + '</b></div>').join('') + '</div></section>' + courseTable(course);
   }
@@ -393,7 +407,7 @@
     const sched = S.res.weeks.map((w) => '<tr class="' + (w.type === 'scramble' ? 'gold' : '') + '"><td>' + (w.type === 'playoff' ? 'P' + w.round : w.n) + '</td><td>' + esc(fmtDate(w.date)) + '</td><td class="l">' + esc(w.course.name) + (w.course.major ? ' <span class="tag gold">major venue</span>' : '') + '</td><td>' + (w.type === 'scramble' ? '2x Scramble' : w.type === 'playoff' ? (w.round === 3 ? 'Final' : 'Match play') : (w.baseline ? 'Baseline (half points)' : 'Stableford')) + '</td><td>' + w.course.parTotal + '</td></tr>').join('');
     return '<section class="panel prose"><h3>How the league works</h3>' +
       '<h4>Format</h4><p>10 players, 10 regular-season weeks on the Full Swing simulator, then a 3-week playoff. Top 6 by season points play a match-play bracket for the whole pot (seeds 1 and 2 get a bye). Seeds 7-10 play a round-robin consolation.</p>' +
-      '<h4>Weekly points (regular weeks)</h4><ul><li>Everyone plays 18 holes. Score is <b>net Stableford</b> (net par = 2 points, birdie 3, bogey 1, double bogey or worse 0). A blow-up hole can only cost you the points on that hole, which keeps a +3 and a 50 on equal footing.</li><li>Your Stableford total is compared against every other player: win = 1, tie = 0.5, scaled to a 0-9 score.</li><li>+' + c.attendancePoint + ' for playing. Missed week = 0 unless the commissioner excuses it (you get your average).</li></ul>' +
+      '<h4>Weekly points (regular weeks)</h4><ul><li>Everyone plays the same holes each week (usually 18, but the commissioner can set a week to the front or back nine). Score is <b>net Stableford</b> (net par = 2 points, birdie 3, bogey 1, double bogey or worse 0). A blow-up hole can only cost you the points on that hole, which keeps a +3 and a 50 on equal footing.</li><li>Your Stableford total is compared against every other player: win = 1, tie = 0.5, scaled to a 0-9 score.</li><li>+' + c.attendancePoint + ' for playing. Missed week = 0 unless the commissioner excuses it (you get your average).</li></ul>' +
       '<h4>Double-points scramble weeks (weeks 5 and 9)</h4><ul><li>2-person net scramble at major venues. Teams pair low handicap with high, and no repeat partners.</li><li>Team handicap = ' + Math.round(c.scrambleLowPct * 100) + '% of the low + ' + Math.round(c.scrambleHighPct * 100) + '% of the high course handicap.</li><li>Both partners earn the same points by finish: ' + c.scramblePoints.map((p, i) => ordinal(i + 1) + ' ' + p).join(', ') + '. A normal week averages about 5.5 and tops out near 10, so these weeks swing the standings.</li><li>Scramble rounds do not count toward handicaps.</li></ul>' +
       '<h4>Handicaps</h4><ul><li><b>Week 1 is the baseline round.</b> It counts half points (max 5) and your index is set from that round, with no weekly cap. After that it moves gradually.</li><li>Each week your index is the average of your best ' + c.hcp.bestOf + ' of your last ' + c.hcp.ofLast + ' differentials (your starting index fills the history until you have played enough rounds).</li><li>Index moves at most +' + c.hcp.capUp + ' / -' + c.hcp.capDown + ' per week. Max index ' + c.hcp.maxIndex + '.</li><li>Each differential is adjusted for course difficulty using the whole field\'s results, so a hard course does not inflate indexes.</li><li>Net double bogey is the most you can post on a hole. Pickups are fine: enter P.</li><li>Handicaps freeze after week 10 for the playoffs.</li></ul>' +
       '<h4>Skins</h4><ul><li>Everyone who plays is in for ' + money(c.skinsBuyIn) + ' a week. Net skins using your course handicap (strokes capped at ' + c.skinsMaxHcp + ').</li><li>Lowest net score outright on a hole wins it. Ties carry the skin to the next hole. The pot is split across all skins won, and if nobody wins a skin the whole pot rolls into next week.</li><li>Scramble weeks play team skins and partners split winnings.</li></ul>' +

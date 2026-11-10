@@ -51,8 +51,8 @@
   const isPickup = (v) => typeof v === 'string' && v.toUpperCase() === PICKUP;
   const isNum = (v) => typeof v === 'number' && isFinite(v) && v > 0;
   const isHole = (v) => isNum(v) || isPickup(v);
-  const completeRound = (r) => Array.isArray(r) && r.length === 18 && r.every(isHole);
-  const completeTeam = (r) => Array.isArray(r) && r.length === 18 && r.every(isNum);
+  const completeRound = (r, n) => Array.isArray(r) && r.length === (n || 18) && r.every(isHole);
+  const completeTeam = (r, n) => Array.isArray(r) && r.length === (n || 18) && r.every(isNum);
 
   function fmtIndex(v) {
     if (v == null || isNaN(v)) return '-';
@@ -69,12 +69,13 @@
 
   /* Strokes received on a hole. Positive handicaps get strokes on the hardest holes first,
    * plus handicaps give strokes back on the easiest holes first. */
-  function strokesOnHole(hcp, si) {
-    if (hcp >= 0) return Math.floor(hcp / 18) + (si <= hcp % 18 ? 1 : 0);
+  function strokesOnHole(hcp, si, n) {
+    n = n || 18; /* n = holes in the round (9 or 18); si runs 1..n */
+    if (hcp >= 0) return Math.floor(hcp / n) + (si <= hcp % n ? 1 : 0);
     const give = -hcp;
-    return -(Math.floor(give / 18) + (si > 18 - (give % 18) ? 1 : 0));
+    return -(Math.floor(give / n) + (si > n - (give % n) ? 1 : 0));
   }
-  const strokeArray = (hcp, si) => si.map((s) => strokesOnHole(hcp, s));
+  const strokeArray = (hcp, si) => si.map((s) => strokesOnHole(hcp, s, si.length));
 
   /* Score used for posting / totals: a pickup is recorded as net double bogey. */
   const postedGross = (v, par, st) => (isPickup(v) ? par + st + 2 : v);
@@ -84,19 +85,32 @@
   function courseFor(week, cfg) {
     const d = cfg.defaultCourse;
     const w = week.course || {};
-    const par = w.par && w.par.length === 18 ? w.par : d.par;
-    const si = w.si && w.si.length === 18 ? w.si : d.si;
+    const par18 = w.par && w.par.length === 18 ? w.par : d.par;
+    const si18 = w.si && w.si.length === 18 ? w.si : d.si;
+    /* a week can be a 9-hole round (front or back nine of the course card) */
+    const n = week.holes === 9 ? 9 : 18;
+    const off = n === 9 && week.nine === 'back' ? 9 : 0;
+    const par = par18.slice(off, off + n);
+    const siCard = si18.slice(off, off + n);
+    /* strokes are allotted over the holes actually played: re-rank the card's handicap numbers 1..n */
+    const sorted = siCard.slice().sort((a, b) => a - b);
+    const si = n === 18 ? siCard : siCard.map((v) => sorted.indexOf(v) + 1);
     const parTotal = sum(par);
     return {
       name: w.name || d.name,
       par,
       si,
+      siCard,
+      holes: n,
+      nine: n === 9 ? (off ? 'back' : 'front') : null,
+      holeNums: par.map((_, i) => off + i + 1),
       parTotal,
-      rating: w.rating != null ? w.rating : parTotal,
+      rating: n === 18 && w.rating != null ? w.rating : parTotal,
       slope: w.slope != null ? w.slope : 113,
     };
   }
-  const courseHcp = (index, c) => Math.round((index * c.slope) / 113 + (c.rating - c.parTotal));
+  /* course handicap for the holes being played (a 9-hole round gets half the 18-hole handicap) */
+  const courseHcp = (index, c) => Math.round(((index * c.slope) / 113) * ((c.holes || 18) / 18) + (c.rating - c.parTotal));
 
   function nextIndex(start, prev, diffs, h) {
     const pool = Array(h.ofLast).fill(start).concat(diffs).slice(-h.ofLast);
@@ -112,7 +126,8 @@
     const won = units.map(() => 0);
     const holes = [];
     let pending = 0;
-    for (let i = 0; i < 18; i++) {
+    const nHoles = units.length ? units[0].net.length : 18;
+    for (let i = 0; i < nHoles; i++) {
       pending++;
       let best = Infinity;
       units.forEach((u) => { if (u.net[i] < best) best = u.net[i]; });
@@ -192,7 +207,7 @@
         players.forEach((p) => {
           const r = week.rounds && week.rounds[p.id];
           if (r == null) return;
-          if (!completeRound(r)) {
+          if (!completeRound(r, course.par.length)) {
             warnings.push(`Week ${week.n}: ${p.name} has an incomplete scorecard, so it was not counted.`);
             return;
           }
@@ -207,7 +222,7 @@
           });
           rows[p.id] = {
             id: p.id, hcp, st, round: r, gross, net: gross - hcp, stableford: sf,
-            diff: r1(((adj - course.rating) * 113) / course.slope),
+            diff: r1((((adj - course.rating) * 113) / course.slope) * (18 / course.par.length)),
           };
         });
         const ids = Object.keys(rows);
@@ -258,7 +273,7 @@
           const allow = week.skinsPlayers;
           skinsUnits = ids.filter((id) => (!allow || allow.includes(id)) && !(week.skinsOut || []).includes(id)).map((id) => {
             const r = rows[id];
-            const sst = strokeArray(Math.min(r.hcp, cfg.skinsMaxHcp), course.si);
+            const sst = strokeArray(Math.min(r.hcp, Math.round(cfg.skinsMaxHcp * course.par.length / 18)), course.si);
             return { id, members: [id], net: r.round.map((v, i) => compareGross(v, course.par[i], sst[i]) - sst[i]) };
           });
         }
@@ -297,7 +312,7 @@
           const ha = courseHcp(idx[t.players[0]], course), hb = courseHcp(idx[t.players[1]], course);
           const teamHcp = Math.round(lo * Math.min(ha, hb) + hi * Math.max(ha, hb));
           const holes = t.holes || [];
-          const complete = completeTeam(holes);
+          const complete = completeTeam(holes, course.par.length);
           const gross = complete ? sum(holes) : t.gross != null ? t.gross : null;
           return {
             players: t.players, hcps: [ha, hb], teamHcp, holes, complete, gross,
@@ -366,8 +381,9 @@
           if (!def.a || !def.b) return;
           m.status = 'pending';
           const ha = courseHcp(idx[def.a], course), hb = courseHcp(idx[def.b], course);
-          const spread = Math.min(cfg.matchSpreadCap, Math.abs(ha - hb));
-          const zero = Array(18).fill(0);
+          const nH = course.par.length;
+          const spread = Math.min(Math.round(cfg.matchSpreadCap * nH / 18), Math.abs(ha - hb));
+          const zero = Array(nH).fill(0);
           const sa = ha > hb ? strokeArray(spread, course.si) : zero;
           const sb = hb > ha ? strokeArray(spread, course.si) : zero;
           m.hcp = { a: ha, b: hb }; m.spread = spread;
@@ -375,7 +391,7 @@
           const ra = week.rounds && week.rounds[def.a], rb = week.rounds && week.rounds[def.b];
           let clinched = false;
           if (ra && rb) {
-            for (let i = 0; i < 18; i++) {
+            for (let i = 0; i < nH; i++) {
               if (!isHole(ra[i]) || !isHole(rb[i])) break;
               const na = compareGross(ra[i], course.par[i], sa[i]) - sa[i];
               const nb = compareGross(rb[i], course.par[i], sb[i]) - sb[i];
@@ -384,16 +400,16 @@
               else if (nb < na) { m.up--; m.bw++; res = 'b'; }
               m.holes.push(res);
               m.played++;
-              if (Math.abs(m.up) > 18 - m.played) { clinched = true; break; }
+              if (Math.abs(m.up) > nH - m.played) { clinched = true; break; }
             }
           }
           const ov = week.overrides && week.overrides[def.id];
-          const done = clinched || m.played === 18;
+          const done = clinched || m.played === nH;
           if (!done) m.status = m.played ? 'live' : 'pending';
           if (done && m.up !== 0) {
             m.winner = m.up > 0 ? def.a : def.b;
             m.status = 'final';
-            m.text = clinched ? Math.abs(m.up) + '&' + (18 - m.played) : Math.abs(m.up) + ' UP';
+            m.text = clinched ? Math.abs(m.up) + '&' + (nH - m.played) : Math.abs(m.up) + ' UP';
           } else if (done) {
             m.text = 'AS';
             if (def.bracket === 'consolation') m.status = 'halved';
@@ -409,6 +425,7 @@
       /* ===== skins (all week types) ===== */
       if (skinsOn && skinsUnits.length >= 2) {
         const res = skinsRound(skinsUnits, carry, cfg.skinsBuyIn);
+        res.holes.forEach((h) => { h.hole = course.holeNums[h.hole - 1]; });
         carry = res.carryOut;
         out.skins = res;
         skinsUnits.forEach((u) => u.members.forEach((id) => { money[id].in += cfg.skinsBuyIn; }));

@@ -56,6 +56,7 @@
     /* basics */
     h += '<section class="panel"><h3>Week settings</h3><div class="form" style="margin-top:12px"><div class="row2"><label class="f">Date<input id="date" type="date" value="' + esc(src.date || '') + '"></label>' +
       '<label class="f">Status<select id="locked"><option value="0"' + (!src.locked ? ' selected' : '') + '>Open</option><option value="1"' + (src.locked ? ' selected' : '') + '>Final: week is closed</option></select></label></div>' +
+      '<label class="f">Holes played<select id="holes"><option value="18"' + (src.holes !== 9 ? ' selected' : '') + '>18 holes</option><option value="front"' + (src.holes === 9 && src.nine !== 'back' ? ' selected' : '') + '>9 holes: front nine (1-9)</option><option value="back"' + (src.holes === 9 && src.nine === 'back' ? ' selected' : '') + '>9 holes: back nine (10-18)</option></select></label>' +
       '<label class="f">Skins<select id="skinson"><option value="1"' + (src.skins !== false ? ' selected' : '') + '>Skins on</option><option value="0"' + (src.skins === false ? ' selected' : '') + '>No skins this week</option></select></label>' +
       '<button class="btn dark" id="saveBasics" type="button">Save week settings</button></div>' +
       '<p class="fine"><a href="submit.html?week=' + week + '">Enter or correct a score</a> (use your admin password there).</p></section>';
@@ -86,7 +87,7 @@
     }
 
     /* course override */
-    const c = w.course;
+    const c = { name: w.course.name, par: (src.course && src.course.par && src.course.par.length === 18) ? src.course.par : L.DEFAULT_PAR, si: (src.course && src.course.si && src.course.si.length === 18) ? src.course.si : L.DEFAULT_SI };
     h += '<section class="panel"><h3>Course card</h3><p class="muted">Compare to the scorecard on the sim screen. If a par or handicap number is off, fix it here and every score recalculates.</p><div class="form">' +
       '<label class="f">Course name<input id="cname" type="text" value="' + esc(c.name) + '"></label>' +
       '<label class="f">Par, holes 1-18 (comma separated)<textarea id="cpar">' + c.par.join(', ') + '</textarea></label>' +
@@ -96,7 +97,7 @@
     /* submissions */
     const stamps = src.stamps || {};
     const solo = Object.keys(src.rounds || {});
-    const teamsWith = (src.teams || []).filter((t) => t.holes && t.holes.length === 18);
+    const teamsWith = (src.teams || []).filter((t) => t.holes && t.holes.length === w.course.par.length);
     h += '<section class="panel"><h3>Submitted scores</h3><div class="sublist">' +
       (solo.map((id) => '<div><span><b>' + esc(R.nm(S, id)) + '</b> <small class="muted">' + esc(R.fmtStamp(stamps[id])) + '</small></span><button class="btn small" data-del="' + esc(id) + '" type="button">Delete</button></div>').join('') +
         teamsWith.map((t) => { const k = Core.teamKey(t.players); return '<div><span><b>' + esc(R.nm(S, k)) + '</b> <small class="muted">team · ' + esc(R.fmtStamp(stamps[k])) + '</small></span><button class="btn small" data-delteam="' + esc(k) + '" type="button">Delete</button></div>'; }).join('') ||
@@ -160,6 +161,12 @@
       const d = metaOf(week);
       d.date = $('date').value || undefined;
       d.locked = $('locked').value === '1';
+      const hv = $('holes').value;
+      if (hv === '18') { delete d.holes; delete d.nine; } else { d.holes = 9; d.nine = hv; }
+      const had = Object.keys(src.rounds || {}).length || (src.teams || []).some((t) => t.holes && t.holes.length);
+      if (had && ((hv === '18') !== (src.holes !== 9) || (hv !== '18' && hv !== (src.nine || 'front')))) {
+        if (!confirm('This week already has scores. Changing the holes played will make the existing scorecards not count until they are re-entered. Continue?')) return;
+      }
       if ($('skinson').value === '0') d.skins = false; else delete d.skins;
       saveMeta(week, d, 'Week settings saved.');
     });
