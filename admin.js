@@ -14,17 +14,17 @@
       S = R.makeState(D);
       if (!D.live) { app.innerHTML = '<section class="panel"><h3>Database not connected</h3><p class="muted">Add your Supabase URL and anon key to config.js first (see the README).</p></section>'; return; }
       const saved = Core.store.sget('pbc_admin');
-      if (saved) { PIN = saved; try { if ((await Core.rpc('whoami', { p_pin: PIN })) === 'admin') return panel(); } catch (e) { /* fall through to login */ } }
+      if (saved) { PIN = saved; try { if ((await Core.rpc('whoami', { p_pin: PIN })) !== 'none') return panel(); } catch (e) { /* fall through to login */ } }
       login();
     } catch (e) { app.innerHTML = '<section class="panel"><h3>Could not load</h3><p class="muted">' + esc(e.message) + '</p></section>'; }
   }
 
   function login() {
-    app.innerHTML = '<section class="panel"><h3>Commissioner PIN</h3><div class="form" style="margin-top:12px"><input id="apin" type="password" placeholder="Admin PIN" autocomplete="off"><button class="btn dark" id="alogin" type="button">Unlock</button><div id="flash"></div></div></section>';
+    app.innerHTML = '<section class="panel"><h3>Admin password</h3><div class="form" style="margin-top:12px"><input id="apin" type="password" placeholder="Your admin password" autocomplete="off"><button class="btn dark" id="alogin" type="button">Unlock</button><div id="flash"></div></div></section>';
     const go = async () => {
       PIN = $('apin').value.trim();
       try {
-        if ((await Core.rpc('whoami', { p_pin: PIN })) !== 'admin') return flash('That is not the admin PIN.', 'err');
+        if ((await Core.rpc('whoami', { p_pin: PIN })) === 'none') return flash('That password is not recognized.', 'err');
         Core.store.sset('pbc_admin', PIN);
         panel();
       } catch (e) { flash(esc(e.message), 'err'); }
@@ -57,7 +57,7 @@
       '<label class="f">Status<select id="locked"><option value="0"' + (!src.locked ? ' selected' : '') + '>Open: players can edit</option><option value="1"' + (src.locked ? ' selected' : '') + '>Locked: admin only</option></select></label></div>' +
       '<label class="f">Skins<select id="skinson"><option value="1"' + (src.skins !== false ? ' selected' : '') + '>Skins on</option><option value="0"' + (src.skins === false ? ' selected' : '') + '>No skins this week</option></select></label>' +
       '<button class="btn dark" id="saveBasics" type="button">Save week settings</button></div>' +
-      '<p class="fine"><a href="submit.html?week=' + week + '">Enter or correct a score</a> (use the admin PIN there, it works on locked weeks).</p></section>';
+      '<p class="fine"><a href="submit.html?week=' + week + '">Enter or correct a score</a> (use your admin password there).</p></section>';
 
     /* scramble teams */
     if (w.type === 'scramble') {
@@ -111,7 +111,7 @@
     if (!el) return;
     try {
       const rows = await Core.sb('submission_log?select=*&order=at.desc&limit=25');
-      el.innerHTML = rows.length ? rows.map((r) => '<div><span>' + esc(r.action) + ' · Wk ' + r.week + ' · <b>' + esc(R.nm(S, r.who)) + '</b>' + (r.by_admin ? ' <span class="tag">admin</span>' : '') + '</span><small class="muted">' + esc(new Date(r.at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })) + '</small></div>').join('') : '<span class="muted">No activity yet.</span>';
+      el.innerHTML = rows.length ? rows.map((r) => '<div><span>' + esc(r.action) + ' · Wk ' + r.week + ' · <b>' + esc(R.nm(S, r.who)) + '</b>' + (r.admin_name ? ' <span class="tag">by ' + esc(r.admin_name) + '</span>' : '') + (r.witness ? ' <span class="tag green">witness ' + esc(R.nm(S, r.witness)) + '</span>' : '') + '</span><small class="muted">' + esc(new Date(r.at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })) + '</small></div>').join('') : '<span class="muted">No activity yet.</span>';
     } catch (e) { el.innerHTML = '<span class="muted">Could not load the log.</span>'; }
   }
 

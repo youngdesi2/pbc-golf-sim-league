@@ -14,12 +14,12 @@ Or edit `data/league.json` directly. Dates and courses live in `tools/courses.js
 
 ## 2. Turn on live score submission (about 5 minutes, free)
 1. Create a free project at supabase.com.
-2. SQL Editor -> paste all of `supabase/schema.sql`. **Change the two PINs at the bottom first**
-   (`CHANGE-ME-PLAYER` is the league PIN you give players, `CHANGE-ME-ADMIN` is yours). Run it.
+2. SQL Editor -> paste all of `supabase/schema.sql`. **Edit the admin names and passwords at the bottom first**
+   (3-4 admins, one password each). Run it.
 3. Project Settings -> API: copy the Project URL and the **anon** key into `config.js`.
    (The anon key is meant to be public. Never use the service_role key.)
 
-Everyone can read scores; nobody can write without a PIN; every submission is logged.
+Everyone can read scores; only league admins (own password each) can write; every submission is logged.
 
 ## 3. Publish on GitHub Pages
 1. Create a repo (e.g. `sim-league`) and push this folder to it.
@@ -29,7 +29,7 @@ Everyone can read scores; nobody can write without a PIN; every submission is lo
 ## Weekly routine
 - Before the round: Commissioner page -> check the course card against the sim's scorecard screen (fix par/handicap
   numbers if the sim differs). Scramble weeks: Suggest pairings -> Save teams.
-- Players submit on `submit.html` with the league PIN. They can fix mistakes until you lock the week.
+- Admins enter scores on `submit.html` with their own password and name the witness. Players only read the site.
 - After the round: lock the week. Settle any all-square playoff match (sudden death) on the Commissioner page.
 
 ## Rules in one screen
