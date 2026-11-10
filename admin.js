@@ -130,6 +130,8 @@
       '<div class="admin-grid" id="rlist">' + players.map(row).join('') + '</div>' +
       '<div style="display:flex;gap:8px;margin:10px 0;flex-wrap:wrap"><button class="btn small" id="radd" type="button">Add player</button></div>' +
       '<div class="form"><div class="row2"><label class="f">League name<input id="cfgName" type="text" value="' + esc(cfg.leagueName || '') + '"></label><label class="f">Season<input id="cfgSeason" type="text" value="' + esc(cfg.season || '') + '"></label></div>' +
+      '<div class="row2"><label class="f">Weekly scoring<select id="cfgFmt"><option value="net"' + (cfg.scoringFormat !== 'stableford' ? ' selected' : '') + '>Net total (lowest wins)</option><option value="stableford"' + (cfg.scoringFormat === 'stableford' ? ' selected' : '') + '>Net Stableford points</option></select></label>' +
+      '<label class="f">Worst a hole can count<select id="cfgCap"><option value="double"' + ((cfg.netCap || 'double') === 'double' ? ' selected' : '') + '>Net double bogey</option><option value="triple"' + (cfg.netCap === 'triple' ? ' selected' : '') + '>Net triple bogey</option><option value="none"' + (cfg.netCap === 'none' ? ' selected' : '') + '>No limit</option></select></label></div>' +
       '<label class="f">Skins buy-in per player ($)<input id="cfgSkins" type="number" step="1" min="0" value="' + (cfg.skinsBuyIn != null ? cfg.skinsBuyIn : 10) + '"></label>' +
       '<h4 style="margin:10px 0 0">Default round rules</h4><p class="muted" style="margin:0">The standing rules for every week. A week can override any of them.</p>' +
       L.RULE_FIELDS.map((f) => '<label class="f">' + esc(f.label) + '<input class="drule" data-k="' + f.key + '" type="text" maxlength="80" value="' + esc((cfg.rules || {})[f.key] != null ? (cfg.rules || {})[f.key] : (L.DEFAULT_RULES[f.key] || '')) + '"></label>').join('') +
@@ -150,7 +152,7 @@
       const players = Array.from(list.querySelectorAll('.teamrow')).map((r) => ({ id: r.dataset.id, name: r.querySelector('.rname').value.trim(), startIndex: parseFloat(r.querySelector('.ridx').value) }));
       if (players.some((p) => !p.name || isNaN(p.startIndex))) return flash('Every player needs a name and a starting index.', 'err');
       if (new Set(players.map((p) => p.name.toLowerCase())).size !== players.length) return flash('Two players have the same name.', 'err');
-      const config = { leagueName: $('cfgName').value.trim() || undefined, season: $('cfgSeason').value.trim() || undefined, skinsBuyIn: parseFloat($('cfgSkins').value) || 0, rules: {} };
+      const config = { leagueName: $('cfgName').value.trim() || undefined, season: $('cfgSeason').value.trim() || undefined, skinsBuyIn: parseFloat($('cfgSkins').value) || 0, scoringFormat: $('cfgFmt').value, netCap: $('cfgCap').value, rules: {} };
       document.querySelectorAll('.drule').forEach((i) => { config.rules[i.dataset.k] = i.value.trim(); });
       try {
         await Core.rpc('admin_set_config', { p_pin: PIN, p_data: { players, config } });

@@ -30,6 +30,7 @@ Everyone can read scores; only league admins (own password each) can write; ever
 - Before the round: Commissioner page -> check the course card against the sim's scorecard screen (fix par/handicap
   numbers if the sim differs). Scramble weeks: Suggest pairings -> Save teams.
 - Round rules (tees, mulligans, gimmes, putting, wind, pins, conditions) have league defaults in the admin roster panel and optional per-week overrides in Week settings; only changes show on the week page.
+- Weekly scoring (net total or Stableford) and the worst a hole can count (net double, net triple, no limit) are settings in the admin roster panel.
 - Each week can be set to 18 holes, front nine or back nine in the admin "Week settings" (stored in the database; default is 18).
 - Admins can edit the roster, starting handicaps, league name and skins buy-in in the "Roster & league settings" panel on the admin page.
 - Admins enter scores on `submit.html` with their own password and name the witness. Players only read the site.

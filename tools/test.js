@@ -98,4 +98,16 @@ console.log(fails ? '\n' + fails + ' FAILED' : '\nall passed');
   ok(r.weeks[1].ruleChanges.map((x) => x.key).join() === 'tees,wind' && r.weeks[1].ruleChanges[0].def === 'White', 'rules: only values that differ from the default are shown (same-as-default and blank are dropped)');
   ok(r.weeks[2].ruleChanges[0].value === '1 per nine' && r.weeks[2].ruleChanges[0].def === 'None', 'rules: mulligans default to None and a week can change it');
 }
+
+/* --- scoring format: net total (default) vs Stableford; the cap on a bad hole --- */
+{
+  const ps = ['a', 'b', 'c'].map((id) => ({ id, name: id, startIndex: 0 }));
+  const hole = (extra) => par.map((p, i) => p + (i === 0 ? extra : 0)); /* par everywhere, one hole is extra */
+  const mkLg = (cfg) => ({ config: cfg, players: ps, weeks: [{ n: 1, type: 'regular', rounds: { a: hole(0), b: hole(3), c: hole(8) } }] });
+  const cap2 = L.compute(mkLg({})).weeks[0].rows, capN = L.compute(mkLg({ netCap: 'none' })).weeks[0].rows, sf = L.compute(mkLg({ scoringFormat: 'stableford' })).weeks[0].rows;
+  ok(cap2.b.netScore === cap2.c.netScore && cap2.a.netScore < cap2.b.netScore, 'net total: a hole is capped at net double bogey by default (a triple and a +8 count the same)');
+  ok(capN.c.netScore > capN.b.netScore, 'net total: with no cap a disaster hole keeps costing strokes');
+  ok(['a', 'b', 'c'].every((id) => cap2[id].rank === sf[id].rank), 'net total capped at net double bogey ranks the same as Stableford');
+  ok(L.compute(mkLg({})).weeks[0].format === 'net' && L.compute(mkLg({ scoringFormat: 'stableford' })).weeks[0].format === 'stableford', 'week reports its scoring format');
+}
 process.exit(fails ? 1 : 0);

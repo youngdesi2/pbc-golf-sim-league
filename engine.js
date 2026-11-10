@@ -2,7 +2,7 @@
  * Pure functions: league JSON in, full season state out. Runs in the browser and in Node.
  *
  * Rules implemented
- *  - Regular weeks: net Stableford, round-robin points (win 1 / tie 0.5 vs every other player,
+ *  - Regular weeks: net total (default, each hole capped at net double bogey) or net Stableford, round-robin points (win 1 / tie 0.5 vs every other player,
  *    scaled to 0..9) + 1 attendance point.
  *  - Scramble weeks: 2-person net scramble, team handicap 35% low + 15% high, fixed points ladder
  *    paid to both partners. Scramble rounds never touch handicaps.
@@ -37,6 +37,10 @@
 
   const DEFAULT_CONFIG = {
     rules: DEFAULT_RULES,
+    /* how a regular week is ranked: 'net' = lowest net total (each hole capped at net double bogey), or 'stableford' */
+    scoringFormat: 'net',
+    /* most a hole can cost in the weekly score: 'double' = net double bogey, 'triple' = net triple, 'none' = no limit */
+    netCap: 'double',
     leagueName: 'Pearl Bee Cave Winter Golf League',
     season: '2026-27',
     attendancePoint: 1,
@@ -184,7 +188,7 @@
       startOf[p.id] = p.startIndex;
       diffs[p.id] = [];
       idxLog[p.id] = [];
-      totals[p.id] = { rr: 0, attend: 0, scramble: 0, total: 0, stableford: 0, played: 0, lowGross: 0, rrHist: [] };
+      totals[p.id] = { rr: 0, attend: 0, scramble: 0, total: 0, stableford: 0, netPar: 0, played: 0, lowGross: 0, rrHist: [] };
       money[p.id] = { in: 0, won: 0 };
     });
     const warnings = [];
@@ -196,10 +200,13 @@
     let carry = 0;
     const rrMax = players.length - 1;
 
+    const useNet = cfg.scoringFormat !== 'stableford';
+    /* higher is better: lowest net total (capped at net double bogey per hole) or most Stableford points */
+    const metric = (r) => (useNet ? -r.netScore : r.stableford);
     const rank = () =>
       players.map((p) => p.id).sort((a, b) =>
         totals[b].total - totals[a].total ||
-        totals[b].stableford - totals[a].stableford ||
+        (useNet ? totals[a].netPar - totals[b].netPar : totals[b].stableford - totals[a].stableford) ||
         name(a).localeCompare(name(b)));
 
     const sorted = league.weeks.slice().sort((a, b) => a.n - b.n);
@@ -207,6 +214,7 @@
     for (const week of sorted) {
       const course = courseFor(week, cfg);
       const out = {
+        format: cfg.scoringFormat !== 'stableford' ? 'net' : 'stableford',
         n: week.n, type: week.type, round: week.round || null, date: week.date || null,
         course, hcpBefore: Object.assign({}, idx), played: false, points: {}, skins: null,
         /* only the rules that differ from the league defaults */
@@ -232,15 +240,18 @@
           }
           const hcp = courseHcp(idx[p.id], course);
           const st = strokeArray(hcp, course.si);
-          let gross = 0, sf = 0, adj = 0;
+          let gross = 0, sf = 0, adj = 0, adjS = 0;
+          const capX = cfg.netCap === 'none' ? Infinity : cfg.netCap === 'triple' ? 3 : 2;
           r.forEach((v, i) => {
             const g = postedGross(v, course.par[i], st[i]);
             gross += g;
             sf += Math.max(0, 2 - (g - st[i] - course.par[i]));
             adj += Math.min(g, course.par[i] + 2 + st[i]);
+            adjS += Math.min(g, course.par[i] + capX + st[i]);
           });
           rows[p.id] = {
             id: p.id, hcp, st, round: r, gross, net: gross - hcp, stableford: sf,
+            netScore: adjS - hcp, netPar: adjS - hcp - course.parTotal,
             diff: r1((((adj - course.rating) * 113) / course.slope) * (18 / course.par.length)),
           };
         });
@@ -250,7 +261,7 @@
           let w = 0;
           ids.forEach((o) => {
             if (o === id) return;
-            const a = rows[id].stableford, b = rows[o].stableford;
+            const a = metric(rows[id]), b = metric(rows[o]);
             w += a > b ? 1 : a === b ? 0.5 : 0;
           });
           rows[id].rrRaw = n > 1 ? r2((rrMax * w) / (n - 1)) : 0;
@@ -263,13 +274,13 @@
           const h = totals[id].rrHist;
           rows[id] = {
             id, excused: true, rr: r2(mult * (h.length ? sum(h) / h.length : rrMax / 2)), attend: 0,
-            hcp: null, gross: null, net: null, stableford: null,
+            hcp: null, gross: null, net: null, stableford: null, netScore: null, netPar: null,
           };
         });
         const rankedIds = Object.keys(rows).filter((id) => !rows[id].excused)
-          .sort((a, b) => rows[b].stableford - rows[a].stableford);
+          .sort((a, b) => metric(rows[b]) - metric(rows[a]));
         rankedIds.forEach((id, i) => {
-          rows[id].rank = i > 0 && rows[id].stableford === rows[rankedIds[i - 1]].stableford ? rows[rankedIds[i - 1]].rank : i + 1;
+          rows[id].rank = i > 0 && metric(rows[id]) === metric(rows[rankedIds[i - 1]]) ? rows[rankedIds[i - 1]].rank : i + 1;
         });
         const minGross = Math.min.apply(null, rankedIds.map((id) => rows[id].gross));
         Object.keys(rows).forEach((id) => {
@@ -278,14 +289,14 @@
           out.points[id] = row.total;
           t.rr += row.rr; t.attend += row.attend; t.total = r2(t.total + row.total);
           if (!row.excused) {
-            t.stableford += row.stableford; t.played++; t.rrHist.push(row.rrRaw);
+            t.stableford += row.stableford; t.netPar += row.netPar; t.played++; t.rrHist.push(row.rrRaw);
             if (row.gross === minGross) { t.lowGross++; row.lowGross = true; }
           }
         });
         out.rows = rows;
         out.order = Object.keys(rows).sort((a, b) =>
           (rows[b].excused ? -1 : 0) - (rows[a].excused ? -1 : 0) ||
-          rows[b].total - rows[a].total || (rows[b].stableford || 0) - (rows[a].stableford || 0));
+          rows[b].total - rows[a].total || (rows[b].excused ? 0 : metric(rows[b])) - (rows[a].excused ? 0 : metric(rows[a])));
         out.played = ids.length > 0;
 
         if (skinsOn) {
@@ -468,11 +479,11 @@
     const standings = order.map((id, i) => {
       const t = totals[id];
       const prev = order[i - 1];
-      const tied = i > 0 && totals[prev].total === t.total && totals[prev].stableford === t.stableford;
+      const tied = i > 0 && totals[prev].total === t.total && (useNet ? totals[prev].netPar === t.netPar : totals[prev].stableford === t.stableford);
       return {
         rank: i + 1, id, name: name(id), index: idx[id], startIndex: byId[id].startIndex,
         played: t.played, rr: r2(t.rr), attend: r2(t.attend), scramble: r2(t.scramble),
-        total: r2(t.total), stableford: t.stableford, lowGross: t.lowGross,
+        total: r2(t.total), stableford: t.stableford, netPar: t.netPar, lowGross: t.lowGross,
         skinsNet: r2(money[id].won - money[id].in), skinsWon: r2(money[id].won), skinsIn: money[id].in,
         tied,
       };
