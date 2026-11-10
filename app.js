@@ -16,7 +16,7 @@
   function draw() {
     if (!S) return;
     const { tab, arg } = parseHash();
-    const fn = R[tab] && ['standings', 'weekly', 'skins', 'handicaps', 'playoffs', 'rules'].includes(tab) ? tab : 'standings';
+    const fn = R[tab] && ['standings', 'schedule', 'weekly', 'skins', 'handicaps', 'playoffs', 'rules'].includes(tab) ? tab : 'standings';
     tabs.forEach((a) => a.classList.toggle('on', a.dataset.tab === fn));
     view.innerHTML = R[fn](S, arg);
     applyFocus();

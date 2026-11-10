@@ -219,6 +219,98 @@
     return out;
   }
 
+
+  /* ---------- SCHEDULE (flip through the season, week by week) ---------- */
+  function schedule(S, arg) {
+    const weeks = S.res.weeks;
+    const n = arg ? parseInt(arg, 10) : currentWeek(S);
+    const w = wk(S, n) || weeks[0];
+    const i = weeks.indexOf(w);
+    const prev = weeks[i - 1], next = weeks[i + 1];
+    const src = S.league.weeks.find((x) => x.n === w.n) || {};
+    const short = (x) => (x.type === 'playoff' ? 'P' + x.round : x.n);
+    const stateOf = (x) => (x.played ? 'done' : '');
+
+    let out = '<div class="flip"><a class="btn small' + (prev ? '' : ' off') + '" href="' + (prev ? '#schedule/' + prev.n : '#schedule/' + w.n) + '" aria-label="Previous week">&larr; ' + (prev ? esc(short(prev) === prev.n ? 'Wk ' + prev.n : weekName(prev)) : 'Start') + '</a>' +
+      '<div class="flip-mid"><b>' + esc(weekName(w)) + '</b><small>' + (i + 1) + ' of ' + weeks.length + '</small></div>' +
+      '<a class="btn small' + (next ? '' : ' off') + '" href="' + (next ? '#schedule/' + next.n : '#schedule/' + w.n) + '" aria-label="Next week">' + (next ? esc(short(next) === next.n ? 'Wk ' + next.n : weekName(next)) : 'End') + ' &rarr;</a></div>';
+    out += '<div class="chips">' + weeks.map((x) => '<a class="chip' + (x.n === w.n ? ' on' : '') + (stateOf(x) ? ' done' : '') + (x.type === 'scramble' ? ' gold' : '') + (x.type === 'playoff' ? ' po' : '') + '" href="#schedule/' + x.n + '" title="' + esc(x.course.name) + '">' + short(x) + '</a>').join('') + '</div>';
+    out += courseHeader(w);
+
+    if (!w.played) {
+      out += '<section class="panel"><h3>Not played yet</h3><p class="muted">' + (w.type === 'playoff' ? 'Playoff matchups are set as the regular season finishes.' : 'Scores, skins and handicap changes show up here once the round is in.') + '</p></section>';
+      if (w.type === 'regular') out += coursehcpBlock(S, w); else out += '<section class="panel"><h3>Course</h3>' + courseTable(w.course) + '</section>';
+      out += '<p class="fine"><a href="#standings">Current standings &rarr;</a></p>';
+      return out;
+    }
+
+    /* rows for every player who has a score this week */
+    const idxAfter = (id) => { const e = (S.res.idxLog[id] || []).find((x) => x.week === w.n); return e ? e.after : w.hcpBefore[id]; };
+    const rr = S.res.race.find((r) => r.n === w.n);
+    const cum = rr ? rr.cum : {};
+    const posOf = {};
+    const ids = S.res.players.map((p) => p.id);
+    ids.slice().sort((a, b) => (cum[b] || 0) - (cum[a] || 0)).forEach((id, k, arr) => { posOf[id] = k > 0 && (cum[id] || 0) === (cum[arr[k - 1]] || 0) ? posOf[arr[k - 1]] : k + 1; });
+    const skinAmt = {};
+    if (w.skins) w.skins.winners.forEach((x) => { skinAmt[x.id] = x.amount; });
+
+    const data = [];
+    if (w.type === 'regular') {
+      w.order.forEach((id) => {
+        const r = w.rows[id];
+        data.push(r.excused ? { id, excused: true, pts: r.total } : { id, rank: r.rank, gross: r.gross, net: r.net, sf: r.stableford, pts: r.total });
+      });
+    } else if (w.type === 'scramble') {
+      (w.teams || []).filter((t) => t.complete).forEach((t) => t.players.forEach((id) => data.push({ id, rank: t.rank, gross: t.gross, net: t.net, pts: w.points[id], team: t })));
+    } else {
+      const course = w.course, rounds = src.rounds || {};
+      S.res.players.forEach((p) => {
+        if (!L.completeRound(rounds[p.id])) return;
+        const h = L.courseHcp(w.hcpBefore[p.id], { slope: 113, rating: course.parTotal, parTotal: course.parTotal });
+        const st = L.strokeArray(h, course.si);
+        const g = rounds[p.id].reduce((a, v, k) => a + (L.isPickup(v) ? course.par[k] + st[k] + 2 : v), 0);
+        data.push({ id: p.id, gross: g, net: g - st.reduce((a, b) => a + b, 0) });
+      });
+      data.sort((a, b) => a.net - b.net).forEach((d, k, arr) => { d.rank = k > 0 && d.net === arr[k - 1].net ? arr[k - 1].rank : k + 1; });
+    }
+    if (w.type === 'scramble') data.sort((a, b) => a.rank - b.rank);
+    const played = data.filter((d) => !d.excused);
+
+    /* highlights */
+    const lowest = (key) => { const m = Math.min.apply(null, played.map((d) => d[key])); return { v: m, who: played.filter((d) => d[key] === m) }; };
+    const names = (arr) => arr.map((d) => (d.team ? nm(S, d.team.players[0]) + ' & ' + nm(S, d.team.players[1]) : nm(S, d.id))).filter((x, k, a) => a.indexOf(x) === k).join(', ');
+    const tile = (label, big, sub, gold) => '<div class="stat' + (gold ? ' gold' : '') + '"><span>' + label + '</span><b>' + big + '</b><small>' + sub + '</small></div>';
+    if (played.length) {
+      const lg = lowest('gross'), ln = lowest('net');
+      const sfBest = w.type === 'regular' ? Math.max.apply(null, played.map((d) => d.sf)) : null;
+      let tiles = tile('Lowest score (gross)', lg.v, esc(names(lg.who)), true) + tile('Lowest net', ln.v, esc(names(ln.who)));
+      if (sfBest != null) tiles += tile('Top Stableford', sfBest, esc(names(played.filter((d) => d.sf === sfBest))));
+      if (w.skins) tiles += tile('Skins pot', money(w.skins.pot), w.skins.skinsWon ? w.skins.skinsWon + ' won · ' + money(w.skins.value) + ' each' : 'rolls to next week');
+      out += '<div class="statgrid">' + tiles + '</div>';
+    }
+
+    /* every player, this week */
+    const isTeam = w.type === 'scramble';
+    const head = '<tr><th>#</th><th class="l">Player</th>' + (w.type === 'playoff' ? '' : '<th class="pts">Pts</th><th>Pos</th>') + '<th>Gr/Net</th>' + (w.type === 'regular' ? '<th>Stbl</th>' : '') + '<th>Hcp</th>' + (w.skins ? '<th>Skins</th>' : '') + '</tr>';
+    const body = data.map((d) => {
+      const before = w.hcpBefore[d.id], after = idxAfter(d.id);
+      const delta = after - before;
+      const hc = L.fmtIndex(before) + (Math.abs(delta) > 0.04 ? '<small class="' + (delta < 0 ? 'pos' : 'neg') + '">&rarr; ' + L.fmtIndex(after) + '</small>' : '');
+      if (d.excused) return '<tr class="muted"><td></td><td class="l">' + esc(nm(S, d.id)) + ' <span class="tag">excused</span></td><td class="pts">' + fp(d.pts) + '</td><td>' + (posOf[d.id] || '') + '<small>' + fp(cum[d.id]) + '</small></td><td></td><td></td><td>' + hc + '</td>' + (w.skins ? '<td></td>' : '') + '</tr>';
+      const lowTag = lowest('gross').who.includes(d) ? ' <span class="tag gold" title="Lowest gross of the week">LG</span>' : '';
+      return '<tr><td class="rk">' + d.rank + '</td><td class="l"><b>' + esc(nm(S, d.id)) + '</b>' + lowTag + '</td>' + (w.type === 'playoff' ? '' : '<td class="pts">' + (d.pts == null ? '-' : fp(d.pts)) + '</td>') +
+        (w.type === 'playoff' ? '' : '<td><b>' + (posOf[d.id] || '') + '</b><small>' + fp(cum[d.id]) + '</small></td>') + '<td>' + d.gross + '<small>' + d.net + '</small></td>' + (w.type === 'regular' ? '<td><b>' + d.sf + '</b></td>' : '') +
+        '<td>' + (isTeam ? '<small class="muted">frozen</small>' : hc) + '</td>' + (w.skins ? '<td class="' + (skinAmt[d.id] ? 'pos' : 'muted') + '">' + (skinAmt[d.id] ? money(skinAmt[d.id]) : '-') + '</td>' : '') + '</tr>';
+    }).join('');
+    out += '<section class="panel"><h3>' + (isTeam ? 'Everyone, this week (team score shared)' : 'Everyone, this week') + '</h3><div class="scroll"><table class="t tight"><thead>' + head + '</thead><tbody>' + body + '</tbody></table></div>' +
+      '<p class="fine">' + (w.type === 'playoff' ? 'Playoff rounds are match play, so the result is in the matchups below. Gross and net are shown for reference.' : '<b>Pos</b> is the league standing right after this week, with total points underneath. <b>Gr/Net</b> is gross with net underneath. <b>Hcp</b> is the index going in and, if it moved, where it landed.') + (w.baseline ? ' Week 1 sets everyone\'s starting handicap.' : '') + '</p></section>';
+
+    if (w.type === 'playoff') out += '<section class="panel"><h3>Matches</h3><div class="matches">' + (w.matches || []).map((m) => matchCard(S, m)).join('') + '</div></section>';
+    out += skinsBlock(S, w);
+    out += '<section class="panel"><h3>Course card</h3>' + courseTable(w.course) + '<p class="fine"><a href="#weekly/' + w.n + '">Full hole-by-hole scorecards &rarr;</a></p></section>';
+    return out;
+  }
+
   /* strokes preview for the upcoming week */
   function coursehcpBlock(S, w) {
     const course = w.course;
@@ -311,5 +403,5 @@
       '<p class="fine">Dates are placeholders until the commissioner confirms them. Course pars and handicap holes come from published scorecards; if the sim\'s card differs, the commissioner can override it for that week.</p></section>';
   }
 
-  window.Render = { makeState, standings, weekly, skins, handicaps, playoffs, rules, esc, nm, fmtDate, fmtStamp, weekName, currentWeek, nextWeek, courseTable, scorecards, fp, wk, money };
+  window.Render = { makeState, standings, weekly, schedule, skins, handicaps, playoffs, rules, esc, nm, fmtDate, fmtStamp, weekName, currentWeek, nextWeek, courseTable, scorecards, fp, wk, money };
 })();
