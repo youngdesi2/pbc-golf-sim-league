@@ -29,6 +29,7 @@ Everyone can read scores; only league admins (own password each) can write; ever
 ## Weekly routine
 - Before the round: Commissioner page -> check the course card against the sim's scorecard screen (fix par/handicap
   numbers if the sim differs). Scramble weeks: Suggest pairings -> Save teams.
+- Admins can edit the roster, starting handicaps, league name and skins buy-in in the "Roster & league settings" panel on the admin page.
 - Admins enter scores on `submit.html` with their own password and name the witness. Players only read the site.
 - After the round: lock the week. Settle any all-square playoff match (sudden death) on the Commissioner page.
 

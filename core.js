@@ -35,6 +35,9 @@
     const league = JSON.parse(JSON.stringify(base));
     const W = {};
     league.weeks.forEach((w) => { W[w.n] = w; w.stamps = {}; });
+    const cfg = db.config || {};
+    if (Array.isArray(cfg.players) && cfg.players.length) league.players = cfg.players;
+    if (cfg.config) league.config = Object.assign({}, league.config, cfg.config);
     (db.meta || []).forEach((m) => {
       const w = W[m.week];
       if (!w) return;
@@ -59,12 +62,13 @@
 
   async function load() {
     const base = await getJSON(FILES[mode] || FILES.live);
-    let db = { subs: [], teams: [], meta: [] };
+    let db = { subs: [], teams: [], meta: [], config: {} };
     if (hasBackend()) {
-      const [subs, teams, meta] = await Promise.all([
+      const [subs, teams, meta, cfgRows] = await Promise.all([
         sb('submissions?select=*'), sb('team_submissions?select=*'), sb('week_meta?select=*'),
+        sb('league_config?select=*').catch(() => []),
       ]);
-      db = { subs, teams, meta };
+      db = { subs, teams, meta, config: (cfgRows[0] && cfgRows[0].data) || {} };
     }
     return { base, db, league: merge(base, db), live: hasBackend(), mode };
   }

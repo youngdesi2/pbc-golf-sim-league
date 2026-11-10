@@ -58,6 +58,16 @@ alter table public.team_submissions add column if not exists witness text;
 alter table public.submission_log   add column if not exists admin_name text;
 alter table public.submission_log   add column if not exists witness text;
 
+create table if not exists public.league_config (
+  id int primary key check (id = 1),
+  data jsonb not null default '{}'::jsonb,
+  updated_at timestamptz not null default now()
+);
+
+alter table public.league_config    enable row level security;
+drop policy if exists "read all" on public.league_config;
+create policy "read all" on public.league_config for select to anon, authenticated using (true);
+
 alter table public.league_secrets   enable row level security;  -- no policies: unreadable
 alter table public.submissions      enable row level security;
 alter table public.team_submissions enable row level security;
@@ -197,6 +207,19 @@ begin
   values (p_week, p_team, null, true, public._admin_name(p_pin), 'delete-team');
 end $$;
 
+create or replace function public.admin_set_config(p_pin text, p_data jsonb)
+returns void language plpgsql security definer
+set search_path = public, extensions as $$
+begin
+  if public._admin_name(p_pin) is null then raise exception 'Wrong admin password'; end if;
+  if p_data is null or jsonb_typeof(p_data) <> 'object' then raise exception 'Bad config'; end if;
+  insert into public.league_config(id, data) values (1, p_data)
+  on conflict (id) do update set data = excluded.data, updated_at = now();
+  insert into public.submission_log(week, who, holes, by_admin, admin_name, action)
+  values (0, 'roster', null, true, public._admin_name(p_pin), 'config');
+end $$;
+
+grant execute on function public.admin_set_config(text, jsonb) to anon, authenticated;
 grant execute on function public.whoami(text) to anon, authenticated;
 drop function if exists public.submit_round(text, int, text, jsonb);
 drop function if exists public.submit_team_round(text, int, text, jsonb);

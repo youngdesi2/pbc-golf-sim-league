@@ -50,11 +50,12 @@
     const players = S.league.players;
     const opt = (sel) => '<option value="">-</option>' + players.map((p) => '<option value="' + esc(p.id) + '"' + (p.id === sel ? ' selected' : '') + '>' + esc(p.name) + '</option>').join('');
     let h = '<div id="flash"></div>';
+    h += rosterPanel();
     h += '<section class="panel"><label class="f">Week<select id="wk">' + S.res.weeks.map((x) => '<option value="' + x.n + '"' + (x.n === week ? ' selected' : '') + '>' + esc(R.weekName(x)) + ' · ' + esc(x.course.name) + '</option>').join('') + '</select></label></section>';
 
     /* basics */
     h += '<section class="panel"><h3>Week settings</h3><div class="form" style="margin-top:12px"><div class="row2"><label class="f">Date<input id="date" type="date" value="' + esc(src.date || '') + '"></label>' +
-      '<label class="f">Status<select id="locked"><option value="0"' + (!src.locked ? ' selected' : '') + '>Open: players can edit</option><option value="1"' + (src.locked ? ' selected' : '') + '>Locked: admin only</option></select></label></div>' +
+      '<label class="f">Status<select id="locked"><option value="0"' + (!src.locked ? ' selected' : '') + '>Open</option><option value="1"' + (src.locked ? ' selected' : '') + '>Final: week is closed</option></select></label></div>' +
       '<label class="f">Skins<select id="skinson"><option value="1"' + (src.skins !== false ? ' selected' : '') + '>Skins on</option><option value="0"' + (src.skins === false ? ' selected' : '') + '>No skins this week</option></select></label>' +
       '<button class="btn dark" id="saveBasics" type="button">Save week settings</button></div>' +
       '<p class="fine"><a href="submit.html?week=' + week + '">Enter or correct a score</a> (use your admin password there).</p></section>';
@@ -115,7 +116,45 @@
     } catch (e) { el.innerHTML = '<span class="muted">Could not load the log.</span>'; }
   }
 
+  function rosterPanel() {
+    const players = S.league.players, cfg = S.league.config || {};
+    const used = new Set();
+    S.league.weeks.forEach((x) => { Object.keys(x.rounds || {}).forEach((id) => used.add(id)); (x.teams || []).forEach((t) => { if (t.holes) t.players.forEach((id) => used.add(id)); }); });
+    const row = (p) => '<div class="teamrow" style="grid-template-columns:1fr 90px auto" data-id="' + esc(p.id) + '"><input class="rname" type="text" value="' + esc(p.name) + '" aria-label="Name"><input class="ridx" type="number" step="0.1" value="' + p.startIndex + '" aria-label="Starting index">' +
+      (used.has(p.id) ? '<span class="muted" title="Has scores">&nbsp;</span>' : '<button class="btn small rdel" type="button">Remove</button>') + '</div>';
+    return '<details class="panel" id="roster"><summary><b>Roster &amp; league settings</b></summary>' +
+      '<p class="muted" style="margin-top:10px">Rename players, change starting handicap indexes, add or remove players. Players with scores entered cannot be removed. Week 1 is the baseline round, so starting indexes only matter until then. The playoff format needs exactly 10 players.</p>' +
+      '<div class="admin-grid" id="rlist">' + players.map(row).join('') + '</div>' +
+      '<div style="display:flex;gap:8px;margin:10px 0;flex-wrap:wrap"><button class="btn small" id="radd" type="button">Add player</button></div>' +
+      '<div class="form"><div class="row2"><label class="f">League name<input id="cfgName" type="text" value="' + esc(cfg.leagueName || '') + '"></label><label class="f">Season<input id="cfgSeason" type="text" value="' + esc(cfg.season || '') + '"></label></div>' +
+      '<label class="f">Skins buy-in per player ($)<input id="cfgSkins" type="number" step="1" min="0" value="' + (cfg.skinsBuyIn != null ? cfg.skinsBuyIn : 10) + '"></label>' +
+      '<button class="btn dark" id="rsave" type="button">Save roster &amp; settings</button></div></details>';
+  }
+
+  function bindRoster() {
+    const list = $('rlist');
+    list.addEventListener('click', (e) => { if (e.target.classList.contains('rdel')) e.target.closest('.teamrow').remove(); });
+    $('radd').addEventListener('click', () => {
+      const ids = new Set(Array.from(list.querySelectorAll('.teamrow')).map((r) => r.dataset.id).concat(S.league.players.map((p) => p.id)));
+      let n = 1; while (ids.has('p' + n)) n++;
+      const d = document.createElement('div'); d.className = 'teamrow'; d.style.gridTemplateColumns = '1fr 90px auto'; d.dataset.id = 'p' + n;
+      d.innerHTML = '<input class="rname" type="text" value="New player" aria-label="Name"><input class="ridx" type="number" step="0.1" value="18" aria-label="Starting index"><button class="btn small rdel" type="button">Remove</button>';
+      list.appendChild(d);
+    });
+    $('rsave').addEventListener('click', async () => {
+      const players = Array.from(list.querySelectorAll('.teamrow')).map((r) => ({ id: r.dataset.id, name: r.querySelector('.rname').value.trim(), startIndex: parseFloat(r.querySelector('.ridx').value) }));
+      if (players.some((p) => !p.name || isNaN(p.startIndex))) return flash('Every player needs a name and a starting index.', 'err');
+      if (new Set(players.map((p) => p.name.toLowerCase())).size !== players.length) return flash('Two players have the same name.', 'err');
+      const config = { leagueName: $('cfgName').value.trim() || undefined, season: $('cfgSeason').value.trim() || undefined, skinsBuyIn: parseFloat($('cfgSkins').value) || 0 };
+      try {
+        await Core.rpc('admin_set_config', { p_pin: PIN, p_data: { players, config } });
+        await reload(); panel(); flash('Roster and settings saved.' + (players.length !== 10 ? ' Note: the playoff format needs exactly 10 players.' : ''));
+      } catch (e) { flash(esc(e.message), 'err'); }
+    });
+  }
+
   function bind(w, src, meta) {
+    bindRoster();
     $('wk').addEventListener('change', () => { week = parseInt($('wk').value, 10); panel(); });
     $('saveBasics').addEventListener('click', () => {
       const d = metaOf(week);
