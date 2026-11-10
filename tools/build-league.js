@@ -22,6 +22,7 @@ const league = {
     leagueName: 'Pearl Bee Cave Winter Golf League',
     season: '2026-27',
     skinsBuyIn: 10,
+    rules: { tees: 'Blue' },
   },
   players,
   weeks,
