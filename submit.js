@@ -132,7 +132,7 @@
       if (team) await Core.rpc('submit_team_round', { p_pin: pin, p_week: n, p_team: Core.teamKey(team.players), p_holes: payload, p_witness: witness });
       else await Core.rpc('submit_round', { p_pin: pin, p_week: n, p_player: pid, p_holes: payload, p_witness: witness });
       Core.store.set('pbc_pin', pin);
-      msg.innerHTML = '<div class="msg ok"><b>Saved.</b> The scorecard is on the leaderboard. <a href="index.html#weekly/' + n + '">See this week &rarr;</a></div>';
+      msg.innerHTML = '<div class="msg ok"><b>Saved.</b> The scorecard is on the leaderboard. <a href="index.html#schedule/' + n + '">See this week &rarr;</a></div>';
       const d = await Core.load(); S = R.makeState(d);
       btn.textContent = 'Update scorecard';
     } catch (e) {

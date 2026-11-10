@@ -15,8 +15,9 @@
 
   function draw() {
     if (!S) return;
-    const { tab, arg } = parseHash();
-    const fn = R[tab] && ['standings', 'schedule', 'weekly', 'skins', 'handicaps', 'playoffs', 'rules'].includes(tab) ? tab : 'standings';
+    let { tab, arg } = parseHash();
+    if (tab === 'weekly') { tab = 'schedule'; history.replaceState(null, '', '#schedule' + (arg ? '/' + arg : '')); }
+    const fn = R[tab] && ['standings', 'schedule', 'skins', 'handicaps', 'playoffs', 'rules'].includes(tab) ? tab : 'standings';
     tabs.forEach((a) => a.classList.toggle('on', a.dataset.tab === fn));
     view.innerHTML = R[fn](S, arg);
     if (fn === 'schedule' && dir) { view.classList.remove('slide-l', 'slide-r'); void view.offsetWidth; view.classList.add(dir > 0 ? 'slide-l' : 'slide-r'); }

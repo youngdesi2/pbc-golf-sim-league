@@ -149,7 +149,7 @@
 
   /* ---------- WEEKLY ---------- */
   function weekChips(S, cur) {
-    return '<div class="chips">' + S.res.weeks.map((w) => '<a class="chip' + (w.n === cur ? ' on' : '') + (w.played ? ' done' : '') + (w.type === 'scramble' ? ' gold' : '') + (w.type === 'playoff' ? ' po' : '') + '" href="#weekly/' + w.n + '">' +
+    return '<div class="chips">' + S.res.weeks.map((w) => '<a class="chip' + (w.n === cur ? ' on' : '') + (w.played ? ' done' : '') + (w.type === 'scramble' ? ' gold' : '') + (w.type === 'playoff' ? ' po' : '') + '" href="#schedule/' + w.n + '">' +
       (w.type === 'playoff' ? 'P' + w.round : w.n) + '</a>').join('') + '</div>';
   }
 
@@ -321,7 +321,13 @@
 
     if (w.type === 'playoff') out += '<section class="panel"><h3>Matches</h3><div class="matches">' + (w.matches || []).map((m) => matchCard(S, m)).join('') + '</div></section>';
     out += skinsBlock(S, w);
-    out += '<section class="panel"><h3>Course card</h3>' + courseTable(w.course) + '<p class="fine"><a href="#weekly/' + w.n + '">Full hole-by-hole scorecards &rarr;</a></p></section>';
+    const cards = [];
+    const stampsS = src.stamps || {};
+    if (w.type === 'regular') w.order.filter((id) => !w.rows[id].excused).forEach((id) => cards.push({ label: nm(S, id), sub: 'Hcp ' + L.fmtHcp(w.rows[id].hcp) + (stampsS[id] ? ' · ' + fmtStamp(stampsS[id]) : ''), holes: w.rows[id].round }));
+    else if (w.type === 'scramble') (w.teams || []).filter((t) => t.complete).forEach((t) => cards.push({ label: nm(S, t.players[0]) + ' & ' + nm(S, t.players[1]), sub: 'Team hcp ' + t.teamHcp, holes: t.holes }));
+    else S.res.players.forEach((p) => { const r = (src.rounds || {})[p.id]; if (L.completeRound(r, w.course.par.length)) cards.push({ label: p.name, sub: stampsS[p.id] ? fmtStamp(stampsS[p.id]) : '', holes: r }); });
+    if (cards.length) out += '<section class="panel"><h3>Scorecards</h3>' + scorecards(cards, w.course) + '</section>';
+    out += '<section class="panel"><h3>Course card</h3>' + courseTable(w.course) + '</section>';
     return out;
   }
 
@@ -346,7 +352,7 @@
     out += '<section class="panel"><h3>Week by week</h3><div class="scroll"><table class="t"><thead><tr><th>Wk</th><th class="l">Course</th><th>In</th><th>Pot</th><th>Skins</th><th>$ / skin</th><th class="l">Top skin winner</th></tr></thead><tbody>' +
       (weeks.length ? weeks.map((w) => {
         const sk = w.skins; const top = sk.winners.slice().sort((a, b) => b.skins - a.skins)[0];
-        return '<tr><td><a href="#weekly/' + w.n + '">' + (w.type === 'playoff' ? 'P' + w.round : w.n) + '</a></td><td class="l">' + esc(w.course.name) + '</td><td>' + sk.entrants + '</td><td>' + money(sk.pot) + (sk.carryIn ? '<small> (incl. ' + money(sk.carryIn) + ' carry)</small>' : '') + '</td><td>' + sk.skinsWon + '</td><td>' + (sk.skinsWon ? money(sk.value) : 'carries') + '</td><td class="l">' + (top ? esc(nm(S, top.id)) + ' (' + top.skins + ')' : '-') + '</td></tr>';
+        return '<tr><td><a href="#schedule/' + w.n + '">' + (w.type === 'playoff' ? 'P' + w.round : w.n) + '</a></td><td class="l">' + esc(w.course.name) + '</td><td>' + sk.entrants + '</td><td>' + money(sk.pot) + (sk.carryIn ? '<small> (incl. ' + money(sk.carryIn) + ' carry)</small>' : '') + '</td><td>' + sk.skinsWon + '</td><td>' + (sk.skinsWon ? money(sk.value) : 'carries') + '</td><td class="l">' + (top ? esc(nm(S, top.id)) + ' (' + top.skins + ')' : '-') + '</td></tr>';
       }).join('') : '<tr><td colspan="7" class="muted">No skins played yet.</td></tr>') + '</tbody></table></div>' +
       '<p class="fine">Weekly net skins. Everyone who plays is in. Ties carry hole to hole, and if nobody wins a skin all week the whole pot rolls into the next week. Scramble weeks play team skins.</p></section>';
     return out;
