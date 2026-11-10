@@ -234,7 +234,7 @@
     let out = '<div class="flip"><a class="btn small' + (prev ? '' : ' off') + '" href="' + (prev ? '#schedule/' + prev.n : '#schedule/' + w.n) + '" aria-label="Previous week">&larr; ' + (prev ? esc(short(prev) === prev.n ? 'Wk ' + prev.n : weekName(prev)) : 'Start') + '</a>' +
       '<div class="flip-mid"><b>' + esc(weekName(w)) + '</b><small>' + (i + 1) + ' of ' + weeks.length + '</small></div>' +
       '<a class="btn small' + (next ? '' : ' off') + '" href="' + (next ? '#schedule/' + next.n : '#schedule/' + w.n) + '" aria-label="Next week">' + (next ? esc(short(next) === next.n ? 'Wk ' + next.n : weekName(next)) : 'End') + ' &rarr;</a></div>';
-    out += '<div class="chips">' + weeks.map((x) => '<a class="chip' + (x.n === w.n ? ' on' : '') + (stateOf(x) ? ' done' : '') + (x.type === 'scramble' ? ' gold' : '') + (x.type === 'playoff' ? ' po' : '') + '" href="#schedule/' + x.n + '" title="' + esc(x.course.name) + '">' + short(x) + '</a>').join('') + '</div>';
+    out += '<p class="fine" style="text-align:center;margin:0 0 6px">Swipe left or right to change weeks</p><div class="chips">' + weeks.map((x) => '<a class="chip' + (x.n === w.n ? ' on' : '') + (stateOf(x) ? ' done' : '') + (x.type === 'scramble' ? ' gold' : '') + (x.type === 'playoff' ? ' po' : '') + '" href="#schedule/' + x.n + '" title="' + esc(x.course.name) + '">' + short(x) + '</a>').join('') + '</div>';
     out += courseHeader(w);
 
     if (!w.played) {

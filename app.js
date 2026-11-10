@@ -19,6 +19,8 @@
     const fn = R[tab] && ['standings', 'schedule', 'weekly', 'skins', 'handicaps', 'playoffs', 'rules'].includes(tab) ? tab : 'standings';
     tabs.forEach((a) => a.classList.toggle('on', a.dataset.tab === fn));
     view.innerHTML = R[fn](S, arg);
+    if (fn === 'schedule' && dir) { view.classList.remove('slide-l', 'slide-r'); void view.offsetWidth; view.classList.add(dir > 0 ? 'slide-l' : 'slide-r'); }
+    dir = 0;
     applyFocus();
     if (!draw.first) { draw.first = true; } else { window.scrollTo({ top: 0 }); }
   }
@@ -59,6 +61,33 @@
       if (refreshBtn) refreshBtn.disabled = false;
     }
   }
+
+  /* swipe left/right (or arrow keys) to flip weeks on the Schedule tab */
+  let dir = 0;
+  function flip(d) {
+    if (!S || parseHash().tab !== 'schedule') return;
+    const btn = view.querySelector('.flip .btn:' + (d > 0 ? 'last-child' : 'first-child'));
+    if (!btn || btn.classList.contains('off')) return;
+    dir = d;
+    location.hash = btn.getAttribute('href');
+  }
+  let t0 = null;
+  view.addEventListener('touchstart', (e) => {
+    const sc = e.target.closest('.scroll, .chips');
+    if (e.touches.length !== 1 || e.target.closest('input, select, textarea') || (sc && sc.scrollWidth > sc.clientWidth + 2)) { t0 = null; return; }
+    t0 = { x: e.touches[0].clientX, y: e.touches[0].clientY, t: Date.now() };
+  }, { passive: true });
+  view.addEventListener('touchend', (e) => {
+    if (!t0) return;
+    const dx = e.changedTouches[0].clientX - t0.x, dy = e.changedTouches[0].clientY - t0.y;
+    const fast = Date.now() - t0.t < 700;
+    t0 = null;
+    if (fast && Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.6) flip(dx < 0 ? 1 : -1);
+  }, { passive: true });
+  document.addEventListener('keydown', (e) => {
+    if (e.target.closest && e.target.closest('input, select, textarea')) return;
+    if (e.key === 'ArrowRight') flip(1); else if (e.key === 'ArrowLeft') flip(-1);
+  });
 
   window.addEventListener('hashchange', draw);
   if (refreshBtn) refreshBtn.addEventListener('click', () => boot(false));
