@@ -285,3 +285,6 @@ textarea { min-height: 80px; font-size: 13px; font-family: ui-monospace, Menlo, 
 #view.slide-l { animation: slideFromRight .22s ease-out; }
 #view.slide-r { animation: slideFromLeft .22s ease-out; }
 @media (prefers-reduced-motion: reduce) { #view.slide-l, #view.slide-r { animation: none; } }
+
+.rulechg { margin-top: 8px; font-size: 13px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.rulechg .tag { white-space: normal; }

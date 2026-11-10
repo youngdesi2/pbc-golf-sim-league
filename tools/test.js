@@ -85,4 +85,17 @@ console.log(fails ? '\n' + fails + ' FAILED' : '\nall passed');
   /* a player who shoots net par on every hole has the same 9-hole stableford ratio as on 18 */
   ok(L.strokeArray(9, f.weeks[0].course.si).every((x) => x === 1), 'strokeArray uses the number of holes played');
 }
+
+/* --- round rules: per-week overrides show only when they differ from the defaults --- */
+{
+  const players = ['a', 'b'].map((id) => ({ id, name: id, startIndex: 0 }));
+  const r = L.compute({ config: { rules: { tees: 'White', gimmes: 'Inside 3 ft' } }, players, weeks: [
+    { n: 1, type: 'regular' },
+    { n: 2, type: 'regular', rules: { tees: 'Blue', gimmes: 'Inside 3 ft', wind: 'Calm', putting: '   ' } },
+    { n: 3, type: 'regular', rules: { mulligans: '1 per nine' } },
+  ] });
+  ok(r.weeks[0].ruleChanges.length === 0, 'rules: a week with no overrides shows nothing');
+  ok(r.weeks[1].ruleChanges.map((x) => x.key).join() === 'tees,wind' && r.weeks[1].ruleChanges[0].def === 'White', 'rules: only values that differ from the default are shown (same-as-default and blank are dropped)');
+  ok(r.weeks[2].ruleChanges[0].value === '1 per nine' && r.weeks[2].ruleChanges[0].def === 'None', 'rules: mulligans default to None and a week can change it');
+}
 process.exit(fails ? 1 : 0);

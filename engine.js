@@ -21,7 +21,22 @@
   const DEFAULT_PAR = [4, 4, 3, 5, 4, 4, 3, 5, 4, 4, 4, 3, 5, 4, 4, 3, 5, 4];
   const DEFAULT_SI = [7, 11, 17, 1, 9, 5, 15, 3, 13, 8, 12, 18, 2, 10, 6, 16, 4, 14];
 
+  /* round rules: league defaults (config.rules) with optional per-week overrides (week.rules) */
+  const RULE_FIELDS = [
+    { key: 'tees', label: 'Tees' },
+    { key: 'mulligans', label: 'Mulligans' },
+    { key: 'retees', label: 'Re-hits / re-tees' },
+    { key: 'gimmes', label: 'Gimmes' },
+    { key: 'putting', label: 'Putting' },
+    { key: 'wind', label: 'Wind' },
+    { key: 'pins', label: 'Pin positions' },
+    { key: 'conditions', label: 'Course conditions' },
+    { key: 'notes', label: 'Other' },
+  ];
+  const DEFAULT_RULES = { tees: '', mulligans: 'None', retees: 'None', gimmes: '', putting: '', wind: '', pins: '', conditions: '', notes: '' };
+
   const DEFAULT_CONFIG = {
+    rules: DEFAULT_RULES,
     leagueName: 'Pearl Bee Cave Winter Golf League',
     season: '2026-27',
     attendancePoint: 1,
@@ -40,6 +55,7 @@
     return Object.assign({}, DEFAULT_CONFIG, c, {
       hcp: Object.assign({}, DEFAULT_CONFIG.hcp, c.hcp || {}),
       defaultCourse: Object.assign({}, DEFAULT_CONFIG.defaultCourse, c.defaultCourse || {}),
+      rules: Object.assign({}, DEFAULT_RULES, c.rules || {}),
     });
   }
 
@@ -193,6 +209,9 @@
       const out = {
         n: week.n, type: week.type, round: week.round || null, date: week.date || null,
         course, hcpBefore: Object.assign({}, idx), played: false, points: {}, skins: null,
+        /* only the rules that differ from the league defaults */
+        ruleChanges: RULE_FIELDS.filter((f) => week.rules && String(week.rules[f.key] || '').trim() && String(week.rules[f.key]).trim() !== String(cfg.rules[f.key] || '').trim())
+          .map((f) => ({ key: f.key, label: f.label, value: String(week.rules[f.key]).trim(), def: String(cfg.rules[f.key] || '').trim() })),
       };
       const skinsOn = week.skins !== false;
       let skinsUnits = [];
@@ -503,5 +522,5 @@
     return lows.map((l, i) => [l, highs[i]]);
   }
 
-  return { compute, suggestPairings, mergeConfig, fmtIndex, fmtHcp, fmtMoney, strokesOnHole, strokeArray, courseHcp, courseFor, isPickup, isHole, completeRound, DEFAULT_CONFIG, DEFAULT_PAR, DEFAULT_SI, PICKUP };
+  return { compute, suggestPairings, mergeConfig, fmtIndex, fmtHcp, fmtMoney, strokesOnHole, strokeArray, courseHcp, courseFor, isPickup, isHole, completeRound, RULE_FIELDS, DEFAULT_RULES, DEFAULT_CONFIG, DEFAULT_PAR, DEFAULT_SI, PICKUP };
 });

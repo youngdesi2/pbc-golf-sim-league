@@ -60,7 +60,8 @@
   function courseHeader(w) {
     const c = w.course;
     return '<div class="course-head' + (c.major ? ' major' : '') + '"><div><div class="eyebrow">' + esc(weekName(w)) + ' &middot; ' + esc(fmtDate(w.date)) + '</div>' +
-      '<h2>' + esc(c.name) + '</h2>' + (c.note ? '<div class="note">' + esc(c.note) + '</div>' : '') + '</div><div>' + weekTag(w) + '<span class="tag">Par ' + c.parTotal + '</span>' + (c.par.length === 9 ? '<span class="tag gold">9 holes &middot; ' + c.nine + ' nine</span>' : '') + '</div></div>';
+      '<h2>' + esc(c.name) + '</h2>' + (c.note ? '<div class="note">' + esc(c.note) + '</div>' : '') +
+      (w.ruleChanges && w.ruleChanges.length ? '<div class="rulechg"><b>Rules this week:</b> ' + w.ruleChanges.map((r) => '<span class="tag gold" title="' + (r.def ? 'Usually: ' + esc(r.def) : 'Not set by default') + '">' + esc(r.label) + ': ' + esc(r.value) + '</span>').join(' ') + '</div>' : '') + '</div><div>' + weekTag(w) + '<span class="tag">Par ' + c.parTotal + '</span>' + (c.par.length === 9 ? '<span class="tag gold">9 holes &middot; ' + c.nine + ' nine</span>' : '') + '</div></div>';
   }
 
   /* hole-by-hole scorecards for a set of rows [{label, holes, sub}] */
@@ -410,13 +411,16 @@
   /* ---------- RULES ---------- */
   function rules(S) {
     const c = S.cfg;
+    const stand = (f) => String(c.rules[f.key] || '').trim() && !((f.key === 'mulligans' || f.key === 'retees') && /^(none|no)$/i.test(c.rules[f.key]));
     const sched = S.res.weeks.map((w) => '<tr class="' + (w.type === 'scramble' ? 'gold' : '') + '"><td>' + (w.type === 'playoff' ? 'P' + w.round : w.n) + '</td><td>' + esc(fmtDate(w.date)) + '</td><td class="l">' + esc(w.course.name) + (w.course.major ? ' <span class="tag gold">major venue</span>' : '') + '</td><td>' + (w.type === 'scramble' ? '2x Scramble' : w.type === 'playoff' ? (w.round === 3 ? 'Final' : 'Match play') : (w.baseline ? 'Baseline (half points)' : 'Stableford')) + '</td><td>' + w.course.parTotal + '</td></tr>').join('');
     return '<section class="panel prose"><h3>Round rules</h3>' +
-      '<ul><li><b>Play it as it lies.</b> No mulligans, no re-hits and no re-tees, on the tee or anywhere else. The first ball you hit on every shot is the one that counts.</li>' +
-      '<li><b>Every stroke counts.</b> Whatever the sim records is your score. No do-overs, no taking a shot back.</li>' +
+      '<ul>' + (/^(none|no)$/i.test(c.rules.mulligans) && /^(none|no)$/i.test(c.rules.retees) ? '<li><b>Play it as it lies.</b> No mulligans, no re-hits and no re-tees, on the tee or anywhere else. The first ball you hit on every shot is the one that counts.</li>' +
+      '<li><b>Every stroke counts.</b> Whatever the sim records is your score. No do-overs, no taking a shot back.</li>' : '') +
       '<li><b>Handicaps:</b> your strokes come from your league index, shown on the submit page and the Schedule tab, and land on the hardest holes first. Nobody adjusts their own handicap.</li>' +
       '<li><b>Pickups:</b> if you are out of a hole, pick up. It is posted as a net double bogey for points and handicap, and you lose that hole in skins and match play.</li>' +
-      '<li><b>Witness:</b> someone from the league has to watch your round, and the admin records who. Rounds are played on sim nights (Monday or Thursday), or any day that week if you cannot make either night.</li></ul></section>' +
+      '<li><b>Witness:</b> someone from the league has to watch your round, and the admin records who. Rounds are played on sim nights (Monday or Thursday), or any day that week if you cannot make either night.</li></ul>' +
+      (L.RULE_FIELDS.some((f) => stand(f)) ? '<h4>Standing sim settings</h4><ul>' + L.RULE_FIELDS.filter(stand).map((f) => '<li><b>' + esc(f.label) + ':</b> ' + esc(c.rules[f.key]) + '</li>').join('') + '</ul>' : '') +
+      '<p class="fine">Any week can change one of these. When it does, the change is listed under that week\'s course name on the Schedule tab.</p></section>' +
       '<section class="panel prose"><h3>How the league works</h3>' +
       '<h4>Format</h4><p>10 players, 10 regular-season weeks on the Full Swing simulator, then a 3-week playoff. Top 6 by season points play a match-play bracket for the whole pot (seeds 1 and 2 get a bye). Seeds 7-10 play a round-robin consolation.</p>' +
       '<h4>Weekly points (regular weeks)</h4><ul><li>Everyone plays the same holes each week (usually 18, but the commissioner can set a week to the front or back nine). Score is <b>net Stableford</b> (net par = 2 points, birdie 3, bogey 1, double bogey or worse 0). A blow-up hole can only cost you the points on that hole, which keeps a +3 and a 50 on equal footing.</li><li>Your Stableford total is compared against every other player: win = 1, tie = 0.5, scaled to a 0-9 score.</li><li>+' + c.attendancePoint + ' for playing. Missed week = 0 unless the commissioner excuses it (you get your average).</li></ul>' +

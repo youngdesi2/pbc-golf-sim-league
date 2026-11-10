@@ -42,7 +42,7 @@
       const w = W[m.week];
       if (!w) return;
       const d = m.data || {};
-      ['teams', 'overrides', 'excused', 'skinsPlayers', 'skinsOut', 'date', 'locked', 'skins', 'holes', 'nine'].forEach((k) => { if (d[k] !== undefined) w[k] = d[k]; });
+      ['teams', 'overrides', 'excused', 'skinsPlayers', 'skinsOut', 'date', 'locked', 'skins', 'holes', 'nine', 'rules'].forEach((k) => { if (d[k] !== undefined) w[k] = d[k]; });
       if (d.course) w.course = Object.assign({}, w.course, d.course);
     });
     (db.subs || []).forEach((s) => {

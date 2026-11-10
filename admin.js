@@ -57,6 +57,8 @@
     h += '<section class="panel"><h3>Week settings</h3><div class="form" style="margin-top:12px"><div class="row2"><label class="f">Date<input id="date" type="date" value="' + esc(src.date || '') + '"></label>' +
       '<label class="f">Status<select id="locked"><option value="0"' + (!src.locked ? ' selected' : '') + '>Open</option><option value="1"' + (src.locked ? ' selected' : '') + '>Final: week is closed</option></select></label></div>' +
       '<label class="f">Holes played<select id="holes"><option value="18"' + (src.holes !== 9 ? ' selected' : '') + '>18 holes</option><option value="front"' + (src.holes === 9 && src.nine !== 'back' ? ' selected' : '') + '>9 holes: front nine (1-9)</option><option value="back"' + (src.holes === 9 && src.nine === 'back' ? ' selected' : '') + '>9 holes: back nine (10-18)</option></select></label>' +
+      '<h4 style="margin:6px 0 0">Round rules this week</h4><p class="muted" style="margin:0">Leave blank to use the league default (shown in grey). Only rules that differ from the default are shown on the week page.</p>' +
+      L.RULE_FIELDS.map((f) => '<label class="f">' + esc(f.label) + '<input class="wrule" data-k="' + f.key + '" type="text" maxlength="80" placeholder="' + esc((S.cfg.rules[f.key] || 'Not set')) + '" value="' + esc(((src.rules || {})[f.key]) || '') + '"></label>').join('') +
       '<label class="f">Skins<select id="skinson"><option value="1"' + (src.skins !== false ? ' selected' : '') + '>Skins on</option><option value="0"' + (src.skins === false ? ' selected' : '') + '>No skins this week</option></select></label>' +
       '<button class="btn dark" id="saveBasics" type="button">Save week settings</button></div>' +
       '<p class="fine"><a href="submit.html?week=' + week + '">Enter or correct a score</a> (use your admin password there).</p></section>';
@@ -129,6 +131,8 @@
       '<div style="display:flex;gap:8px;margin:10px 0;flex-wrap:wrap"><button class="btn small" id="radd" type="button">Add player</button></div>' +
       '<div class="form"><div class="row2"><label class="f">League name<input id="cfgName" type="text" value="' + esc(cfg.leagueName || '') + '"></label><label class="f">Season<input id="cfgSeason" type="text" value="' + esc(cfg.season || '') + '"></label></div>' +
       '<label class="f">Skins buy-in per player ($)<input id="cfgSkins" type="number" step="1" min="0" value="' + (cfg.skinsBuyIn != null ? cfg.skinsBuyIn : 10) + '"></label>' +
+      '<h4 style="margin:10px 0 0">Default round rules</h4><p class="muted" style="margin:0">The standing rules for every week. A week can override any of them.</p>' +
+      L.RULE_FIELDS.map((f) => '<label class="f">' + esc(f.label) + '<input class="drule" data-k="' + f.key + '" type="text" maxlength="80" value="' + esc((cfg.rules || {})[f.key] != null ? (cfg.rules || {})[f.key] : (L.DEFAULT_RULES[f.key] || '')) + '"></label>').join('') +
       '<button class="btn dark" id="rsave" type="button">Save roster &amp; settings</button></div></details>';
   }
 
@@ -146,7 +150,8 @@
       const players = Array.from(list.querySelectorAll('.teamrow')).map((r) => ({ id: r.dataset.id, name: r.querySelector('.rname').value.trim(), startIndex: parseFloat(r.querySelector('.ridx').value) }));
       if (players.some((p) => !p.name || isNaN(p.startIndex))) return flash('Every player needs a name and a starting index.', 'err');
       if (new Set(players.map((p) => p.name.toLowerCase())).size !== players.length) return flash('Two players have the same name.', 'err');
-      const config = { leagueName: $('cfgName').value.trim() || undefined, season: $('cfgSeason').value.trim() || undefined, skinsBuyIn: parseFloat($('cfgSkins').value) || 0 };
+      const config = { leagueName: $('cfgName').value.trim() || undefined, season: $('cfgSeason').value.trim() || undefined, skinsBuyIn: parseFloat($('cfgSkins').value) || 0, rules: {} };
+      document.querySelectorAll('.drule').forEach((i) => { config.rules[i.dataset.k] = i.value.trim(); });
       try {
         await Core.rpc('admin_set_config', { p_pin: PIN, p_data: { players, config } });
         await reload(); panel(); flash('Roster and settings saved.' + (players.length !== 10 ? ' Note: the playoff format needs exactly 10 players.' : ''));
@@ -161,6 +166,9 @@
       const d = metaOf(week);
       d.date = $('date').value || undefined;
       d.locked = $('locked').value === '1';
+      const wr = {};
+      document.querySelectorAll('.wrule').forEach((i) => { if (i.value.trim()) wr[i.dataset.k] = i.value.trim(); });
+      if (Object.keys(wr).length) d.rules = wr; else delete d.rules;
       const hv = $('holes').value;
       if (hv === '18') { delete d.holes; delete d.nine; } else { d.holes = 9; d.nine = hv; }
       const had = Object.keys(src.rounds || {}).length || (src.teams || []).some((t) => t.holes && t.holes.length);
